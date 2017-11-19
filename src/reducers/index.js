@@ -2,6 +2,7 @@ import { combineReducers } from 'redux';
 import { routerReducer } from 'react-router-redux';
 
 import analytics from './analytics';
+import api from '../api/reducer';
 import authentication from './authentication';
 import errors from './errors';
 import events from './events';
@@ -11,21 +12,22 @@ import preloadIndicator from './preloadIndicator';
 import select from './select';
 import session from './session';
 import source from './source';
-import api from '../api/reducer';
+import title from './title';
 
 const appReducer = combineReducers({
-  routing: routerReducer,
   analytics,
+  api,
   authentication,
+  errors,
   events,
   modal,
   notifications,
+  preloadIndicator,
+  routing: routerReducer,
   select,
   session,
   source,
-  api,
-  errors,
-  preloadIndicator,
+  title,
 });
 
 export default function rootReducer(state, action) {

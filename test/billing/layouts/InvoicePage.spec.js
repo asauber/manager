@@ -13,15 +13,17 @@ describe('billing/layouts/InvoicePage', () => {
   const invoice = invoices.invoices[1234];
   const items = invoice._items.data;
   const sandbox = sinon.sandbox.create();
+  let page = undefined;
 
   afterEach(() => {
     sandbox.restore();
+    page.unmount();
   });
 
   const dispatch = sandbox.spy();
 
   it('renders a list of invoice items', () => {
-    const page = mount(
+    page = mount(
       <InvoicePage
         dispatch={dispatch}
         invoice={invoice}
@@ -30,12 +32,10 @@ describe('billing/layouts/InvoicePage', () => {
     );
 
     expect(page.find('.TableRow').length).to.equal(items.length);
-
-    page.unmount();
   });
 
   it('renders invoice total', () => {
-    const page = mount(
+    page = mount(
       <InvoicePage
         dispatch={dispatch}
         invoice={invoice}
@@ -44,7 +44,5 @@ describe('billing/layouts/InvoicePage', () => {
     );
 
     expect(page.find('strong').text()).to.equal(`Invoice Total: $${(invoice.total).toFixed(2)}`);
-
-    page.unmount();
   });
 });
