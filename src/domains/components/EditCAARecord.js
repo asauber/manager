@@ -7,6 +7,8 @@ import { FormModalBody } from 'linode-components/modals';
 import api from '~/api';
 import { dispatchOrStoreErrors } from '~/api/util';
 
+import SelectDNSSeconds from './SelectDNSSeconds';
+
 const tagOptions = [
     { value: 'issue', label: 'issue', index: 0 },
     { value: 'issuewild', label: 'issueWild', index: 1 },
@@ -16,15 +18,19 @@ const tagOptions = [
 export default class EditCAARecord extends Component {
   constructor(props) {
     super();
-
-    const { id } = props;
+    const { id, zone: { ttl_sec: defaultTTL } } = props;
     const {
       tag,
       target,
+      name,
+      ttl_sec: ttl,
     } = props.zone._records.records[id] || {};
 
     this.state = {
       errors: {},
+      name,
+      ttl,
+      defaultTTL,
       tag: tag || tagOptions[0].value,
       target: target || '',
     };
@@ -34,11 +40,13 @@ export default class EditCAARecord extends Component {
 
   onSubmit = () => {
     const { dispatch, id, close } = this.props;
-    const { tag, target } = this.state;
+    const { tag, target, name, ttl } = this.state;
     const ids = [this.props.zone.id, id].filter(Boolean);
     const data = {
       tag,
       target,
+      name,
+      ttl_sec: +ttl,
       type: 'CAA',
     };
 
@@ -54,6 +62,9 @@ export default class EditCAARecord extends Component {
       errors,
       tag,
       target,
+      name,
+      ttl,
+      defaultTTL,
     } = this.state;
 
     const analytics = { title, action: id ? 'edit' : 'add' };
@@ -85,6 +96,23 @@ export default class EditCAARecord extends Component {
               onChange={this.onChange}
             />
           </ModalFormGroup>
+          <ModalFormGroup id="name" label="Domain" apiKey="name" errors={errors}>
+            <Input
+              id="name"
+              name="name"
+              value={name}
+              onChange={this.onChange}
+            />
+          </ModalFormGroup>
+          <ModalFormGroup label="TTL" id="ttl" apiKey="ttl_sec" errors={errors}>
+          <SelectDNSSeconds
+            id="ttl"
+            name="ttl"
+            value={ttl}
+            defaultSeconds={defaultTTL}
+            onChange={this.onChange}
+          />
+        </ModalFormGroup>
         </div>
       </FormModalBody>
     );
