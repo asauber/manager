@@ -20,10 +20,10 @@ export default class EditCAARecord extends Component {
     super();
     const { id, zone: { ttl_sec: defaultTTL } } = props;
     const {
-      tag,
-      target,
       name,
       ttl_sec: ttl,
+      tag,
+      target,
     } = props.zone._records.records[id] || {};
 
     this.state = {
@@ -105,14 +105,14 @@ export default class EditCAARecord extends Component {
             />
           </ModalFormGroup>
           <ModalFormGroup label="TTL" id="ttl" apiKey="ttl_sec" errors={errors}>
-          <SelectDNSSeconds
-            id="ttl"
-            name="ttl"
-            value={ttl}
-            defaultSeconds={defaultTTL}
-            onChange={this.onChange}
-          />
-        </ModalFormGroup>
+            <SelectDNSSeconds
+              id="ttl"
+              name="ttl"
+              value={ttl}
+              defaultSeconds={defaultTTL}
+              onChange={this.onChange}
+            />
+          </ModalFormGroup>
         </div>
       </FormModalBody>
     );
