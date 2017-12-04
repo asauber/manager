@@ -87,7 +87,7 @@
     "history": "^2.1.2",
     "isomorphic-fetch": "^2.2.0",
     "jest": "^21.2.1",
-    "linode-components": "file:./components",
+    "linode-components": "https://github.com/asauber/components.git#194548fcf2f4c70e42847490c1efeaef3d1039ab",
     "linode-styleguide": "file:./styleguide",
     "lodash": "^4.16.4",
     "md5": "^2.1.0",
