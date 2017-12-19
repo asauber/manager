@@ -43,8 +43,11 @@ function abuseTicket(banners) {
 }
 
 function migrations(banners, linode) {
-  const banner = banners.find(banner => banner.entity.id === linode.id);
+  if (!linode) {
+    return null;
+  }
 
+  const banner = banners.find(banner => banner.entity.id === linode.id);
   if (banner) {
     return (
       <div className="migration">
