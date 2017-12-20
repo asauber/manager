@@ -10,6 +10,7 @@ import {
   outstandingBalanceBanner,
   scheduledRebootBanner,
   xsaBanner,
+  outageBanners,
 } from '~/data/banners';
 
 describe('components/Banners filterBy', () => {
@@ -54,11 +55,24 @@ describe('components/Banners filterBy', () => {
     ).toEqual([andrew, rob]);
   });
 });
+
 describe('components/Banners', () => {
   const linode = {
     id: 1234,
     label: 'my-linode',
   };
+
+  it('renders no banners when no notices are present', () => {
+    const banner = shallow(
+      <Banners
+        banners={[]}
+        params={{}}
+        linodes={{ linodes: {} }}
+      />
+    );
+
+    expect(banner.find('.Banner')).toHaveLength(0);
+  });
 
   it('renders an important ticket banner', () => {
     const banner = shallow(
@@ -104,7 +118,7 @@ describe('components/Banners', () => {
     expect(banner.find('.Banner Link').props().to).toBe('/support');
   });
 
-  it('should render a notice for scheduled reboot banner', () => {
+  it('should render a warning for scheduled reboot banner', () => {
     const wrapper = shallow(
       <Banners
         banners={[scheduledRebootBanner]}
@@ -112,7 +126,7 @@ describe('components/Banners', () => {
       />
     );
 
-    expect(wrapper.find('div.notice').length).toBe(1);
+    expect(wrapper.find('div.warning').length).toBe(1);
   });
 
   it('should render a critical for xsa banner', () => {
@@ -136,5 +150,19 @@ describe('components/Banners', () => {
     expect(wrapper.find('div.critical').length).toBe(1);
     expect(wrapper.find('Link').length).toBe(1);
     expect(wrapper.find('Link').prop('to')).toBe('/billing/payment');
+  });
+
+  it('renders an outage banner for multiple datacenters', () => {
+    const banner = shallow(
+      <Banners
+        banners={outageBanners}
+        params={{}}
+        linodes={{ linodes: {} }}
+      />
+    );
+
+    expect(banner.find('.Banner')).toHaveLength(1);
+    const expected = expect.stringMatching('us-east-1a, us-south-1a');
+    expect(banner.find('.Banner > div').text()).toEqual(expected);
   });
 });

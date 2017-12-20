@@ -24,13 +24,13 @@ export function filterBy(pred, data) {
 function importantTicket(banners) {
   if (banners.length > 1) {
     return (
-      <div className="notice">
+      <div className="warning">
         You have <Link to="/support">important tickets</Link> open!
       </div>
     );
   } else if (banners.length === 1) {
     return (
-      <div className="notice">
+      <div className="warning">
         You have an <Link to={`/support/${banners[0].entity.id}`}>important ticket</Link> open!
       </div>
     );
@@ -58,7 +58,7 @@ function abuseTicket(banners) {
 function migrations(banners) {
   return (
     banners.map((banner, key) =>
-      < div className="notice" key={key} >
+      < div className="warning" key={key} >
         You have a host migration {banner.type.split('_')[0]} for this linode!
       </div >
     )
@@ -68,7 +68,7 @@ function migrations(banners) {
 function scheduledReboot(banners) {
   return (
     banners.map((banner, key) =>
-      <div className="notice" key={key}>
+      <div className="warning" key={key}>
         {banner.entity.label} is scheduled to reboot.
       </div>
     )
@@ -87,56 +87,77 @@ function xenSecurityAdvisory(banners) {
 
 function outstandingBalance(banners) {
   return (
-    /* eslint-disable max-len */
     banners.map((banner, key) =>
       <div className="critical" key={key}>
-        You have an outstanding balance. Please <Link to="/billing/payment">make a payment</Link> to avoid service interruption.
+        You have an outstanding balance.
+        &nbsp;Please <Link to="/billing/payment">make a payment</Link>
+        &nbsp;to avoid service interruption.
       </div>
-      /* eslint-enable max-len */
     )
   );
 }
 
+function outage(banners) {
+  const datacenterNames = banners.map(banner => banner.entity.id);
+
+  if (datacenterNames.length) {
+    return (
+      <div className="info">
+        We are aware of issues affecting service in the following facilities:
+        &nbsp;{datacenterNames.join(', ')}
+      </div>
+    );
+  }
+}
+
 function renderBanners(banners, linode = {}) {
   const abuseBanners = filterBy(
-    [(banner) => banner.type === 'abuse_ticket'],
+    [banner => banner.type === 'abuse_ticket'],
     banners
   );
 
   const importantTicketBanners = filterBy(
-    [(banner) => banner.type === 'important_ticket'],
+    [banner => banner.type === 'important_ticket'],
     banners
   );
 
   const outstandingBalanceBanners = filterBy(
-    [(banner) => banner.type === 'outstanding_balance'],
+    [banner => banner.type === 'outstanding_balance'],
     banners
   );
 
   const migrationBanners = filterBy(
-    [banner => ['pending_migration', 'scheduled_migration'].indexOf(banner.type) >= 0],
+    [
+      banner => ['pending_migration', 'scheduled_migration'].indexOf(banner.type) >= 0,
+      banner => banner.entity.id === linode.id,
+    ],
     banners
   );
 
   const scheduledRebootBanners = filterBy(
     [
-      (banner) => banner.type === 'scheduled_reboot',
-      (banner) => banner.entity.id === linode.id,
+      banner => banner.type === 'scheduled_reboot',
+      banner => banner.entity.id === linode.id,
     ],
     banners
   );
 
   const xenSecurityAdvisoryBanners = filterBy(
     [
-      (banner) => banner.type === 'xsa',
-      (banner) => banner.entity.id === linode.id,
+      banner => banner.type === 'xsa',
+      banner => banner.entity.id === linode.id,
     ],
+    banners
+  );
+
+  const outageBanners = filterBy(
+    [banner => banner.type === 'outage'],
     banners
   );
 
   return (
     <div className="Banner">
-      {abuseBanners.length ?
+      {!isEmpty(abuseBanners) ?
         abuseTicket(abuseBanners) :
         importantTicket(importantTicketBanners)
       }
@@ -144,6 +165,7 @@ function renderBanners(banners, linode = {}) {
       {!isEmpty(migrationBanners) && migrations(migrationBanners)}
       {!isEmpty(scheduledRebootBanners) && scheduledReboot(scheduledRebootBanners)}
       {!isEmpty(xenSecurityAdvisoryBanners) && xenSecurityAdvisory(xenSecurityAdvisoryBanners)}
+      {!isEmpty(outageBanners) && outage(outageBanners)}
     </div>
   );
 }
