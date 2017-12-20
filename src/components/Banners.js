@@ -47,23 +47,22 @@ function abuseTicket(banners) {
   } else if (banners.length === 1) {
     const ticket = banners[0].entity;
     return (
-      <div className="abuseTicket">
+      <div className="critical">
         You have an abuse ticket open!
         &nbsp;<Link to={`/support/${ticket.id}`}>[Ticket #{ticket.id}]</Link>
-        &nbsp;banners[0].entity.label
       </div>
     );
   }
 }
 
 function migrations(banners) {
-  banners.map((banner, key) => {
-    return (
-      <div className="notice" key={key}>
+  return (
+    banners.map((banner, key) =>
+      < div className="notice" key={key} >
         You have a host migration {banner.type.split('_')[0]} for this linode!
-      </div>
-    );
-  });
+      </div >
+    )
+  );
 }
 
 function scheduledReboot(banners) {
