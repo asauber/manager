@@ -39,6 +39,10 @@ module.exports = {
   module: {
     rules: [
       {
+        test: /\.md$/,
+        use: ['ignore-loader'],
+      },
+      {
         test: /\.json$/,
         use: ['json-loader'],
       },
