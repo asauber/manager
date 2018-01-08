@@ -21,12 +21,12 @@ without having to write any of the above "by-hand".
 
 ## Format of the `config` object
 
-To achieve this, the configuration object must contain some information 
-about the endpoint, and possibly some "sub-endpoints". What we call the
-`config` object here is actually the object passed to genConfig. This is a
-plain object which can contain the following keys.
+The configuration object must contain some information about the endpoint,
+and possibly some "sub-endpoints". What we call the `config` object here is
+actually the object passed to genConfig. This is a plain object which can
+contain the following keys.
 
-### `endpoint` : `function(id?: string): string` (required)
+### `endpoint : function(id?: string): string` (required)
 
 A function which returns a path to the resource, relative to the root of the
 API server. If the resource has both a path for collections and individual
@@ -46,5 +46,3 @@ For an endpoint that does not have a path to individual entities:
 For an endpoint that does have a path to individual entities:
 
     endpoint: id => `/domains/${id}`,
-
-###
