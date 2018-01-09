@@ -26,6 +26,10 @@ and possibly some "sub-endpoints". What we call the `config` object here is
 actually the object passed to genConfig. This is a plain object which can
 contain the following keys.
 
+### `name: string` (required)
+
+This 
+
 ### `endpoint : function(id?: string): string` (required)
 
 A function which returns a path to the resource, relative to the root of the
