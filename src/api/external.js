@@ -86,35 +86,17 @@ function genThunkAll(config, actions, fetchPage) {
         fetchPage(0, ids, resourceFilter, true, null, options));
       const resources = [resource];
 
-      // Grab all pages we know about.
+      // Grab all pages we know about and store then in Redux
       const requests = [];
       for (let i = 1; i < resources[0].pages; i += 1) {
         requests.push(fetchPage(i, ids, resourceFilter, true, null, options));
       }
 
+      // Gather all the results
       const allPages = await Promise.all(requests.map(r => dispatch(r)));
       allPages.forEach(function (response) {
         resources.push(response);
       });
-
-      // If the number of total results returned by the last page is different
-      // than the total number of results we have, restart.
-      const numFetchedResources = resources.map(
-        resource => resource[config.name].length
-      ).reduce((a, b) => a + b);
-      const numExpectedResources = resources[resources.length - 1].results;
-      if (numFetchedResources !== numExpectedResources) {
-        return await dispatch(fetchAll(ids, resourceFilter));
-      }
-
-      // Waits until all things have been fetched so we don't have UI flashes
-      // while we wait for requests to be made and the results saved in the redux store.
-      if (state.invalid) {
-        dispatch(actions.invalidate());
-
-        await Promise.all(resources.map(page =>
-          dispatch(actions.many(page, ...ids))));
-      }
 
       // The resulting object will look like this, return it so anyone can use it immediately.
       const res = {
