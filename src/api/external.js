@@ -1,6 +1,6 @@
 import { fetch } from './fetch';
 import {
-  ONE, MANY, DELETE, POST, PUT, generateDefaultStateFull, isPlural
+  ONE, MANY, DELETE, POST, PUT,
 } from './internal';
 
 
@@ -73,10 +73,7 @@ function genThunkPage(config, actions) {
 }
 
 /*
- * This function fetches all pages. If the final page indicates the total results
- * were not fetched, it restarts the process. If it is fixing partial invalidation,
- * it waits to invalidate and store the new data into the store until all the
- * pages have been fetched.
+ * This function fetches all pages and stores them in the Redux store
  */
 function genThunkAll(config, actions, fetchPage) {
   function fetchAll(ids = [], resourceFilter, options) {
