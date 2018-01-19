@@ -24,7 +24,7 @@ export default class AddLinode extends Component {
     return dispatch(showModal(AddLinode.title, (
       <AddLinode
         dispatch={dispatch}
-        close={() => dispatch(hideModal())}
+        onClose={() => dispatch(hideModal())}
         images={images}
         plans={plans}
       />
@@ -64,13 +64,13 @@ export default class AddLinode extends Component {
   }
 
   render() {
-    const { close, images, plans } = this.props;
+    const { onClose, images, plans } = this.props;
     const { errors, label, image, region, plan, backups, password } = this.state;
 
     return (
       <FormModalBody
         onSubmit={this.onSubmit}
-        onCancel={close}
+        onCancel={onClose}
         buttonText="Add Linode"
         buttonDisabledText="Adding Linode"
         analytics={{ title: AddLinode.title, action: 'add' }}
@@ -145,7 +145,7 @@ export default class AddLinode extends Component {
 
 AddLinode.propTypes = {
   dispatch: PropTypes.func.isRequired,
-  close: PropTypes.func.isRequired,
+  onClose: PropTypes.func.isRequired,
   images: PropTypes.object.isRequired,
   plans: PropTypes.object.isRequired,
 };

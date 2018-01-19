@@ -2,6 +2,8 @@ import pickBy from 'lodash/pickBy';
 import PropTypes from 'prop-types';
 import React, { Component } from 'react';
 import { connect } from 'react-redux';
+import { Route, HashRouter } from 'react-router-dom';
+import { push } from 'react-router-redux';
 import { compose } from 'redux';
 import PrimaryButton from 'linode-components/dist/buttons/PrimaryButton';
 import Input from 'linode-components/dist/forms/Input';
@@ -27,6 +29,7 @@ import ChainedDocumentTitle from '~/components/ChainedDocumentTitle';
 import CreateHelper from '~/components/CreateHelper';
 import { IPAddressCell, RegionCell, BackupsCell } from '~/components/tables/cells';
 import StatusDropdownCell from '~/linodes/components/StatusDropdownCell';
+import { PortalModal } from '~/modal';
 import { confirmThenDelete } from '~/utilities';
 
 import { planStyle } from '../components/PlanStyle';
@@ -188,10 +191,22 @@ export class ListLinodesPage extends Component {
     );
   }
 
+  addLinodeModal() {
+    const { dispatch, images, types } = this.props;
+    this.setState({
+      modal: {
+        dispatch: dispatch,
+        images: images,
+        plans: types,
+      },
+    });
+    dispatch(push('#add'));
+  }
+
   render() {
     const { dispatch, linodes, images, types, transfer } = this.props;
 
-    const addLinode = () => AddLinode.trigger(dispatch, images, types);
+    const addLinode = () => this.addLinodeModal();
     const cloneLinode = () => CloneLinode.trigger(dispatch, linodes, types);
     const restoreLinode = () => RestoreLinode.trigger(dispatch, linodes, types);
 
@@ -203,6 +218,22 @@ export class ListLinodesPage extends Component {
     return (
       <div className="PrimaryPage container">
         <ChainedDocumentTitle title="Linodes" />
+          <Route
+            render={(matchProps) =>
+              (matchProps.location.hash === '#add') && (
+                <PortalModal>
+                  <AddLinode
+                    title={AddLinode.title}
+                    onClose={() => {
+                      dispatch(push('#'));
+                      console.log('hiiii');
+                    }}
+                    {...this.state.modal}
+                  />
+                </PortalModal>
+              )
+            }
+          />
         <header className="PrimaryPage-header">
           <div className="PrimaryPage-headerRow clearfix">
             <h1 className="float-left">Linodes</h1>

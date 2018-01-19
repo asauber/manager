@@ -30,5 +30,4 @@ export default function BackupsCheckbox(props) {
 BackupsCheckbox.propTypes = {
   plans: PropTypes.object.isRequired,
   plan: PropTypes.any,
-  value: PropTypes.any.isRequired,
 };

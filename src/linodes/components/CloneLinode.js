@@ -24,7 +24,7 @@ export default class CloneLinode extends Component {
     return dispatch(showModal(CloneLinode.title, (
       <CloneLinode
         dispatch={dispatch}
-        close={() => dispatch(hideModal())}
+        onClose={() => dispatch(hideModal())}
         linodes={linodes}
         plans={plans}
       />
@@ -50,13 +50,13 @@ export default class CloneLinode extends Component {
   }
 
   render() {
-    const { close, plans, linodes } = this.props;
+    const { onClose, plans, linodes } = this.props;
     const { errors, label, region, plan, linode, backups } = this.state;
 
     return (
       <FormModalBody
         onSubmit={this.onSubmit}
-        onCancel={close}
+        onCancel={onClose}
         buttonText="Clone Linode"
         buttonDisabledText="Cloning Linode"
         analytics={{ title: CloneLinode.title, action: 'add' }}
@@ -119,7 +119,7 @@ export default class CloneLinode extends Component {
 
 CloneLinode.propTypes = {
   dispatch: PropTypes.func.isRequired,
-  close: PropTypes.func.isRequired,
+  onClose: PropTypes.func.isRequired,
   linodes: PropTypes.object.isRequired,
   plans: PropTypes.object.isRequired,
 };

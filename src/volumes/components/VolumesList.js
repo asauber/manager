@@ -1,6 +1,7 @@
 import filter from 'lodash/filter';
 import PropTypes from 'prop-types';
 import React, { Component } from 'react';
+import { Route } from 'react-router-dom';
 
 import LinkButton from 'linode-components/dist/buttons/LinkButton';
 import Dropdown from 'linode-components/dist/dropdowns/Dropdown';
@@ -20,6 +21,7 @@ import { actions as linodeActions } from '~/api/generic/linodes';
 import { detachVolume } from '~/api/ad-hoc/volumes';
 import { transform } from '~/api/util';
 import { RegionCell } from '~/components/tables/cells';
+import { PortalModal } from '~/modal';
 import { confirmThenDelete } from '~/utilities';
 
 import AddEditVolume from './AddEditVolume';
@@ -109,6 +111,10 @@ export default class VolumesList extends Component {
     );
   }
 
+  addEditVolumeModal = () => {
+
+  }
+
   renderVolumeActions = ({ column, record }) => {
     const { dispatch, linodes } = this.props;
 
@@ -147,7 +153,7 @@ export default class VolumesList extends Component {
   }
 
   render() {
-    const { dispatch, selectedMap, volumes, objectType, className } = this.props;
+    const { dispatch, selectedMap, volumes, objectType, className, linodes } = this.props;
     const { filter } = this.state;
 
     const { sorted } = transform(volumes, {
@@ -156,6 +162,21 @@ export default class VolumesList extends Component {
 
     return (
       <List>
+        <Route
+          render={(matchProps) =>
+            (matchProps.location.hash === '#add') && (
+              <PortalModal>
+                <AddEditVolume
+                  dispatch={dispatch}
+                  close={() => console.log('closing')}
+                  linodes={linodes}
+                  title={AddEditVolume.title}
+                  volume={volume}
+                />
+              </PortalModal>
+            )
+          }
+          />
         <ListHeader className="Menu">
           <div className="Menu-item">
             <MassEditControl
