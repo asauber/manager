@@ -120,8 +120,9 @@ export default class AddImage extends Component {
     return disks.length === 2 && regularCount === 1 && swapCount === 1;
   }
 
-  renderDiskOptions = (disks, disk) => {
-    const { rawDisks, swapDisks, diskOptions } = this.disksByType(disks);
+  creatingFromDisk = (diskOptions, disk) => (!diskOptions.length && disk);
+
+  renderDiskOptions = (disk, diskOptions, rawDisks, swapDisks) => {
     const diskField = diskOptions.length ?
       /* UX request:
         If a Linode is not a "Simple Linode" but it only has one option,
@@ -152,7 +153,9 @@ export default class AddImage extends Component {
     const { dispatch } = this.props;
     const { label, description, errors, linode, linodes, disk, allDisks, loading } = this.state;
     const disks = allDisks[linode] || [];
+    const { rawDisks, swapDisks, diskOptions } = this.disksByType(disks);
     const isSimpleLinode = this.isSimpleLinode(disks);
+    const creatingFromDisk = this.creatingFromDisk(diskOptions, disk);
 
     return (
       <FormModalBody
@@ -177,7 +180,8 @@ export default class AddImage extends Component {
               </small>
             </ModalFormGroup>
             : null}
-          {(!loading && !isSimpleLinode) && this.renderDiskOptions(disks, disk)}
+          {(!loading && !isSimpleLinode && !creatingFromDisk) &&
+            this.renderDiskOptions(disk, diskOptions, rawDisks, swapDisks)}
           <ModalFormGroup errors={errors} id="label" label="Label" apiKey="label">
             <Input
               id="label"
