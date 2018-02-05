@@ -40,7 +40,14 @@ export function filterResources(config, resources, resourceFilter) {
   return filteredResources;
 }
 
-function genThunkOne(config, actions) {
+/*
+ * Takes a Redux config and generated Redux actions and returns a thunk
+ * action creator. This action creator takes a "path" array of resource ids
+ * and an optional additional HTTP headers. When dispatched, it fetches
+ * the resource by building the endpoint using the "path" of resource ids
+ * and dispatches and action to store the single resource in the Redux store.
+*/
+export function genThunkOne(config, actions) {
   return (ids = [], headers = {}) => async (dispatch) => {
     const endpoint = config.endpoint(...ids);
     const resource = await dispatch(fetch.get(endpoint, undefined, headers));
@@ -50,11 +57,12 @@ function genThunkOne(config, actions) {
 }
 
 /*
- * This function fetches a single page and stores it into the redux state by default.
- * All results are optionally filtered so only certain fields (or none) are updated.
- * The results are returned.
+ * Takes a Redux config and generated Redux actions and returns a thunk
+ * action creator. This action creator fetches a single page and stores it
+ * into the redux state by default. All results are optionally filtered so
+ * only certain fields (or none) are updated. The results are returned.
  */
-function genThunkPage(config, actions) {
+export function genThunkPage(config, actions) {
   function fetchPage(page = 0, ids = [], resourceFilter, headers) {
     return async (dispatch) => {
       const endpoint = `${config.endpoint(...ids, '')}?page=${page + 1}`;
@@ -70,9 +78,11 @@ function genThunkPage(config, actions) {
 }
 
 /*
- * This function fetches all pages, stores them in Redux and returns the result
+ * Takes a Redux config and generated Redux actions and returns a thunk
+ * action creator. This action creator fetches all pages, stores them in
+ * Redux and returns the result.
  */
-function genThunkAll(config, actions, fetchPage) {
+export function genThunkAll(config, actions, fetchPage) {
   function fetchAll(ids = [], resourceFilter, options) {
     return async (dispatch) => {
       // Grab first page so we know how many there are.
@@ -91,10 +101,12 @@ function genThunkAll(config, actions, fetchPage) {
       allPages.forEach(function (response) {
         resources.push(response);
       });
+
       const res = {
         ...resources[resources.length - 1],
         [config.name]: resources.reduce((a, b) => [...a, ...b[config.name]], []),
       };
+
       return res;
     };
   }
@@ -102,7 +114,13 @@ function genThunkAll(config, actions, fetchPage) {
   return fetchAll;
 }
 
-function genThunkDelete(config, actions) {
+/*
+ * Takes a Redux config and generated Redux actions and returns a thunk
+ * action creator. This action creator takes one or more ids which are a
+ * "path" to a specific resource and makes an API call to delete the
+ * resource specified by that "path". The response from the API is returned.
+ */
+export function genThunkDelete(config, actions) {
   return (...ids) => async (dispatch) => {
     const endpoint = config.endpoint(...ids);
     const json = await dispatch(fetch.delete(endpoint));
@@ -111,7 +129,14 @@ function genThunkDelete(config, actions) {
   };
 }
 
-function genThunkPut(config, actions) {
+/*
+ * Takes a Redux config and generated Redux actions and returns a thunk
+ * action creator. This action creator takes an object representing the keys
+ * and values of a resource to be modified and one or more ids which are a
+ * "path" to the specific resource, and makes an API call to modify the
+ * resource specified by that "path". The response from the API is returned.
+ */
+export function genThunkPut(config, actions) {
   return (resource, ...ids) => async (dispatch) => {
     const endpoint = config.endpoint(...ids);
     const json = await dispatch(fetch.put(endpoint, resource));
@@ -120,7 +145,14 @@ function genThunkPut(config, actions) {
   };
 }
 
-function genThunkPost(config, actions) {
+/*
+ * Takes a Redux config and generated Redux actions and returns a thunk
+ * action creator. This action creator takes an object representing a new
+ * resource to be created and one or more ids which are a "path" to a
+ * specific resource, and makes an API call to create the resource specified
+ * by that "path". The response from the API is returned.
+ */
+export function genThunkPost(config, actions) {
   return (resource, ...ids) => {
     return async (dispatch) => {
       const endpoint = config.endpoint(...ids, '');
