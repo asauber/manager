@@ -3,6 +3,7 @@ import PropTypes from 'prop-types';
 import React, { Component } from 'react';
 import { connect } from 'react-redux';
 import { compose } from 'redux';
+import InfiniteScroll from 'react-infinite-scroller';
 import PrimaryButton from 'linode-components/dist/buttons/PrimaryButton';
 import Input from 'linode-components/dist/forms/Input';
 import List from 'linode-components/dist/lists/List';
@@ -68,6 +69,7 @@ export class DomainsList extends Component {
     const { groups, sorted: sortedZones } = transform(zones, {
       filterBy: filter,
       filterOn: 'domain',
+      sortByFn: o => o.id,
     });
 
     return (
@@ -137,7 +139,7 @@ export class DomainsList extends Component {
   }
 
   render() {
-    const { dispatch, email } = this.props;
+    const { dispatch, email, domains } = this.props;
 
     const addMaster = () => AddMaster.trigger(dispatch, email);
     const addSlave = () => AddSlave.trigger(dispatch);
@@ -147,21 +149,29 @@ export class DomainsList extends Component {
     ];
 
     return (
-      <div className="PrimaryPage container">
-        <header className="PrimaryPage-header">
-          <div className="PrimaryPage-headerRow clearfix">
-            <h1 className="float-left">Domains</h1>
-            <PrimaryButton onClick={addMaster} options={addOptions} className="float-right">
-              Add a Domain
-            </PrimaryButton>
+      <InfiniteScroll
+        pageStart={0}
+        hasMore={domains.ids.length < domains.totalResults}
+        initialLoad={false}
+        loadMore={(page) => dispatch(api.domains.page(page))}
+        loader={<div key="domains-loader">Loading...</div>}
+      >
+        <div className="PrimaryPage container">
+          <header className="PrimaryPage-header">
+            <div className="PrimaryPage-headerRow clearfix">
+              <h1 className="float-left">Domains</h1>
+              <PrimaryButton onClick={addMaster} options={addOptions} className="float-right">
+                Add a Domain
+              </PrimaryButton>
+            </div>
+          </header>
+          <div className="PrimaryPage-body">
+            {Object.keys(domains.domains).length ?
+              this.renderZones(domains.domains) :
+              <CreateHelper label="Domains" onClick={addMaster} linkText="Add a Domain" />}
           </div>
-        </header>
-        <div className="PrimaryPage-body">
-          {Object.keys(this.props.domains.domains).length ?
-            this.renderZones(this.props.domains.domains) :
-            <CreateHelper label="Domains" onClick={addMaster} linkText="Add a Domain" />}
         </div>
-      </div>
+      </InfiniteScroll>
     );
   }
 }
@@ -183,7 +193,7 @@ function mapStateToProps(state) {
 }
 
 const preloadRequest = async (dispatch) => {
-  await dispatch(api.domains.all());
+  await dispatch(api.domains.page(0));
 };
 
 export default compose(
