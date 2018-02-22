@@ -46,11 +46,37 @@ const primaryLinks = [
   { display: 'Images', icon: InsertPhotoIcon, href: '/images' },
 ];
 
-type Props = StyledComponentProps & RouteComponentProps<{}> & {
-  toggleMenu: () => void, 
-};
+/**
+ * So it looks like we can merge interfaces and types, and it appears interfaces
+ * are the preferred method for describing props for React components.
+ *
+ * https://www.typescriptlang.org/docs/handbook/declaration-merging.html
+*/
+interface Props extends StyledComponentProps, RouteComponentProps<any> {
+  toggleMenu: () => void;
+}
+
+/**
+ * IMO it's sensible to provide empty defaults, rather than the early return
+ * in the render method. defaultProps is a little involved, here's what I found.
+ * 
+ * @see https://github.com/DefinitelyTyped/DefinitelyTyped/issues/11640#issuecomment-295155472
+*/
+interface DefaultProps {
+  classes: any;
+}
+
+type PropsWithDefaults = Props & DefaultProps;
 
 class PrimaryNav extends React.Component<Props> {
+  /**
+   * Should we provide a sensible default to classes to prevent reference
+   * errors?
+   */
+  public static defaultProps: DefaultProps = {
+    classes: {},
+  };
+
   state = {
     drawerOpen: false,
   };
@@ -60,7 +86,7 @@ class PrimaryNav extends React.Component<Props> {
   }
 
   navigate(href: string) {
-    const { history , toggleMenu } = this.props;
+    const { history, toggleMenu } = this.props as PropsWithDefaults;
     history.push(href);
     toggleMenu();
   }
@@ -82,11 +108,7 @@ class PrimaryNav extends React.Component<Props> {
   }
 
   render() {
-    const { classes } = this.props;
-
-    if (!classes) {
-      return null;
-    }
+    const { classes } = this.props as PropsWithDefaults;
 
     return (
       <React.Fragment>

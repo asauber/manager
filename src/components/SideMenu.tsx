@@ -26,18 +26,24 @@ const styles = (theme: any): any => ({
   },
 });
 
-type Props = StyledComponentProps & {
-  open: boolean, 
-  toggle: () => void,
-};
+interface Props extends StyledComponentProps {
+  open: boolean;
+  toggle: () => void;
+}
+
+interface DefaultProps  {
+  classes: {};
+}
+
+type PropsWithDefaults = Props & DefaultProps;
 
 class SideMenu extends React.Component<Props> {
-  render() {
-    const { classes, open, toggle } = this.props;
+  static defaultProps = {
+    classes: {},
+  };
 
-    if (!classes) {
-      return null;
-    }
+  render() {
+    const { classes, open, toggle } = this.props as PropsWithDefaults;
 
     return (
       <React.Fragment>
