@@ -31,10 +31,16 @@ type Info = { name: string, details: string } | undefined;
 type TypeInfo = { name: string, details: string, monthly: number } | undefined;
 
 type Styles =
-  'root';
+'root'
+| 'main'
+| 'sidebar';
 
 const styles = (theme: Theme & Linode.Theme): StyleRules => ({
   root: {
+  },
+  main: {
+  },
+  sidebar: {
   },
 });
 
@@ -191,16 +197,16 @@ class LinodeCreate extends React.Component<CombinedProps, State> {
       && backups !== null
       && privateIP !== null
     ) {
-      console.log(`Ready for deployment!
-selectedImageID: ${selectedImageID},
-selectedRegionID: ${selectedRegionID},
-selectedTypeID: ${selectedTypeID},
-label: ${label},
-password: ${password},
-backups: ${backups},
-privateIP: ${privateIP}`);
+//       console.log(`Ready for deployment!
+// selectedImageID: ${selectedImageID},
+// selectedRegionID: ${selectedRegionID},
+// selectedTypeID: ${selectedTypeID},
+// label: ${label},
+// password: ${password},
+// backups: ${backups},
+// privateIP: ${privateIP}`);
     } else {
-      console.log('Not ready for deployment. Make sure to provide a selection for all options');
+      // console.log('Not ready for deployment. Make sure to provide a selection for all options');
     }
   }
 
@@ -233,6 +239,8 @@ privateIP: ${privateIP}`);
       selectedRegionID,
     } = this.state;
 
+    const { classes } = this.props;
+
     const imageInfo = this.getImageInfo(this.props.images.response.find(
       image => image.id === selectedImageID));
 
@@ -246,9 +254,9 @@ privateIP: ${privateIP}`);
 
     return (
       <StickyContainer>
-        <Typography variant="headline">Create New Linode</Typography>
         <Grid container>
-          <Grid item md={12} lg={10} >
+          <Grid item className={`${classes.main} mlMain`}>
+            <Typography variant="headline">Create New Linode</Typography>
             <AppBar position="static" color="default">
               <Tabs
                 value={selectedTab}
@@ -261,7 +269,7 @@ privateIP: ${privateIP}`);
             </AppBar>
             {tabRender()}
           </Grid>
-          <Grid item md={12} lg={2}>
+          <Grid item className={`${classes.sidebar} mlSidebar`}>
             <Sticky>
               {
                 (props: StickyProps) => {
