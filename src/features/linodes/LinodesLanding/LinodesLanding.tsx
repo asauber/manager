@@ -13,14 +13,19 @@ import {
   RouteComponentProps,
 } from 'react-router-dom';
 
+<<<<<<< HEAD
 import { events$ } from 'src/events';
+=======
+import { linodeEvents$ } from 'src/events';
+import { newLinodeEvents } from 'src/features/linodes/events';
+>>>>>>> 28c6d9fa... factor out newLinodeEvents filter logic
 import ErrorState from 'src/components/ErrorState';
 import WithDocumentation from 'src/components/WithDocumentation';
+import PaginationFooter from 'src/components/PaginationFooter';
 
 import LinodesListView from './LinodesListView';
 import LinodesGridView from './LinodesGridView';
 import ListLinodesEmptyState from './ListLinodesEmptyState';
-import PaginationFooter from '../../../components/PaginationFooter';
 import ToggleBox from './ToggleBox';
 
 import './linodes.css';
@@ -102,6 +107,7 @@ class ListLinodes extends React.Component<CombinedProps, State> {
 
   componentDidMount() {
     const mountTime = moment().subtract(5, 'seconds');
+<<<<<<< HEAD
     this.subscription = events$
       .filter((linodeEvent) => {
 
@@ -130,6 +136,10 @@ class ListLinodes extends React.Component<CombinedProps, State> {
 
           return result;
       })
+=======
+    this.subscription = linodeEvents$
+      .filter(newLinodeEvents(mountTime))
+>>>>>>> 28c6d9fa... factor out newLinodeEvents filter logic
       .subscribe((linodeEvent) => {
         Axios.get(`${API_ROOT}/linode/instances/${(linodeEvent.entity as Linode.Entity).id}`)
           .then(response => response.data)
