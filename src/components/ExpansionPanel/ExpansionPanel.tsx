@@ -108,7 +108,7 @@ class EExpansionPanel extends React.Component<CombinedProps> {
     const notice = success || warning || error || null;
 
     return (
-      <ExpansionPanel expanded={this.state.open} {...expansionPanelProps} className={classes.root}>
+      <ExpansionPanel {...expansionPanelProps} className={classes.root}>
         <ExpansionPanelSummary
           onClick={this.handleClick}
           expandIcon={this.state.open ? <Minus /> : <Plus />}
