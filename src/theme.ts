@@ -225,6 +225,7 @@ const LinodeTheme: Linode.Theme = {
         lineHeight: 1,
         minHeight: 44,
         boxSizing: 'border-box',
+        backgroundColor: 'white',
         '& svg': {
           fontSize: 18,
           marginLeft: 8,
