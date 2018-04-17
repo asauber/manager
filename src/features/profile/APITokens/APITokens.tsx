@@ -115,6 +115,8 @@ class APITokens extends React.Component<CombinedProps, State> {
     },
   };
 
+  mounted: boolean = false;
+
   state = {
     pats: pathOr([], ['response', 'data'], this.props.pats),
     ...APITokens.defaultState,
@@ -217,7 +219,11 @@ class APITokens extends React.Component<CombinedProps, State> {
   requestTokens = () => {
     Axios.get(`${API_ROOT}/profile/tokens`)
     .then(response => response.data.data)
-    .then(data => this.setState({ pats: data }));
+    .then((data) => {
+      if (!this.mounted) { return; }
+
+      return this.setState({ pats: data });
+    });
   }
 
   openCreateDrawer = () => {
@@ -309,6 +315,8 @@ class APITokens extends React.Component<CombinedProps, State> {
       })
       .then(() => this.requestTokens())
       .catch((errResponse) => {
+        if (!this.mounted) { return; }
+
         this.setState({ form: {
           ...form,
           errors: path(['response', 'data', 'errors'], errResponse),
@@ -323,11 +331,21 @@ class APITokens extends React.Component<CombinedProps, State> {
     .then(() => { this.closeDrawer(); })
     .then(() => this.requestTokens())
     .catch((errResponse) => {
+      if (!this.mounted) { return; }
+
       this.setState({ form: {
         ...form,
         errors: path(['response', 'data', 'errors'], errResponse),
       }});
     });
+  }
+
+  componentDidMount() {
+    this.mounted = true;
+  }
+
+  componentWillUnmount() {
+    this.mounted = false;
   }
 
   render() {
