@@ -27,6 +27,12 @@ import LinodeConfigSelectionDrawer, {
   LinodeConfigSelectionDrawerCallback,
 } from 'src/features/LinodeConfigSelectionDrawer';
 import setDocs, { SetDocsProps } from 'src/components/DocsSidebar/setDocs';
+import {
+  preferences,
+  setPreference,
+  getPreference,
+  clearAllPreferences,
+} from 'src/services/preferences';
 
 import LinodesListView from './LinodesListView';
 import LinodesGridView from './LinodesGridView';
@@ -34,7 +40,7 @@ import ListLinodesEmptyState from './ListLinodesEmptyState';
 import ToggleBox from './ToggleBox';
 
 import './linodes.css';
-import { Typography, WithStyles } from 'material-ui';
+import { Typography, WithStyles, Button } from 'material-ui';
 
 type ClassNames = 'root' | 'title';
 
@@ -211,6 +217,7 @@ export class ListLinodes extends React.Component<CombinedProps, State> {
 
   changeViewStyle = (style: string) => {
     const { history } = this.props;
+    setPreference(preferences.LINODE_VIEW, style);
     history.push(`#${style}`);
   }
 
@@ -332,6 +339,11 @@ export class ListLinodes extends React.Component<CombinedProps, State> {
               handleClick={this.changeViewStyle}
               status={displayGrid}
             />
+            <Button
+              onClick={() => { clearAllPreferences(); }}
+            >
+              Clear All Preferences
+            </Button>
           </Hidden>
         </Grid>
         <Grid item xs={12}>
