@@ -13,6 +13,7 @@ import RenderGuard from 'src/components/RenderGuard';
 import SelectionCard from 'src/components/SelectionCard';
 import TabbedPanel from 'src/components/TabbedPanel';
 import { Tab } from 'src/components/TabbedPanel/TabbedPanel';
+import { sortRegions } from 'src/utilities';
 
 const flags = {
   us: () => <US width="32" height="24" viewBox="0 0 720 480" />,
@@ -68,9 +69,9 @@ class SelectRegionPanel extends React.Component<Props & WithStyles<ClassNames>> 
   createTabs = () => {
     const { regions } = this.props;
     const tabs: Tab[] = [];
-    const na = getNARegions(regions);
-    const eu = getEURegions(regions);
-    const as = getASRegions(regions);
+    const na = sortRegions(getNARegions(regions));
+    const eu = sortRegions(getEURegions(regions));
+    const as = sortRegions(getASRegions(regions));
 
     if (!isEmpty(na)) {
       tabs.push({

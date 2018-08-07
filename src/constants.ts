@@ -73,3 +73,45 @@ export const dcDisplayCountry = {
   'eu-central': 'DE',
   'ap-northeast': 'JP',
 };
+
+/* Used to sort regions, which will usually be grouped by continent */
+export const regionOrder = [
+  /** North America */
+  /* Dallas, TX */
+  'us-south',
+  'us-south-1a',
+  'us-central',
+ 
+  /* Fremont, CA */
+  'us-west',
+  'us-west-1a',
+ 
+  /* Fremont, CA */
+  'us-southeast',
+  'us-southeast-1a',
+
+  /* Newark, NJ */
+  'us-east',
+  'us-east-1a',
+
+  /** Europe */
+  /* London, UK */
+  'eu-west',
+  'eu-west-1a',
+
+  /* Frankfurt, DE */
+  'eu-central',
+  'eu-central-1a',
+
+  /** Asia */
+  /* Singapore, SG */
+  'ap-south',
+  'ap-south-1a',
+
+  /* Tokyo, JP */
+  'ap-northeast',
+  'ap-northeast-1a',
+
+  /* Tokyo 2, JP */
+  'ap-northeast-1b',
+];
