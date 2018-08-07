@@ -28,6 +28,7 @@ import { getLinodeTypes } from 'src/services/linodes';
 import { getRegions } from 'src/services/misc';
 import { getProfile } from 'src/services/profile';
 import { request, response } from 'src/store/reducers/resources';
+import { sortRegions } from 'src/utilities';
 import composeState from 'src/utilities/composeState';
 
 import BetaNotification from './BetaNotification';
@@ -216,7 +217,7 @@ export class App extends React.Component<CombinedProps, State> {
             this.composeState([
               set(L.regionsContext.loading, false),
               set(L.regionsContext.lastUpdated, Date.now()),
-              set(L.regionsContext.data, response.data),
+              set(L.regionsContext.data, sortRegions(response.data)),
             ])
           })
           .catch((error) => {

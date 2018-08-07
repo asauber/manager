@@ -86,7 +86,7 @@ export const regionOrder = [
   'us-west',
   'us-west-1a',
  
-  /* Fremont, CA */
+  /* Atlanta, GA */
   'us-southeast',
   'us-southeast-1a',
 
