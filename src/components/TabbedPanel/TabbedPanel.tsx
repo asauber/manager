@@ -1,3 +1,4 @@
+import * as classNames from 'classnames';
 import * as React from 'react';
 import AppBar from 'src/components/core/AppBar';
 import Paper from 'src/components/core/Paper';
@@ -9,6 +10,7 @@ import {
 import Tab from 'src/components/core/Tab';
 import Tabs from 'src/components/core/Tabs';
 import Typography from 'src/components/core/Typography';
+import { safeGetTabRender } from 'src/utilities/safeGetTabRender';
 import Notice from '../Notice';
 
 type ClassNames = 'root' | 'inner' | 'copy' | 'tabs' | 'panelBody';
@@ -46,10 +48,12 @@ interface Props {
   error?: string;
   copy?: string;
   rootClass?: string;
+  innerClass?: string;
   tabs: Tab[];
   [index: string]: any;
   initTab?: number;
   bodyClass?: string;
+  noPadding?: boolean;
   handleTabChange?: (value?: number) => void;
 }
 
@@ -74,16 +78,19 @@ class TabbedPanel extends React.Component<CombinedProps> {
       copy,
       error,
       rootClass,
+      innerClass,
+      noPadding,
       ...rest
     } = this.props;
     const { value } = this.state;
-    const render = tabs[value].render;
+    // if this bombs the app shouldn't crash
+    const render = safeGetTabRender(tabs, value);
 
     return (
       <Paper className={`${classes.root} ${rootClass}`} data-qa-tp={header}>
-        <div className={`${classes.inner}`}>
+        <div className={`${classes.inner} ${innerClass}`}>
           {error && <Notice text={error} error />}
-          <Typography role="header" variant="h2" data-qa-tp-title>
+          <Typography variant="h2" data-qa-tp-title>
             {header}
           </Typography>
           {copy && (
@@ -111,7 +118,12 @@ class TabbedPanel extends React.Component<CombinedProps> {
             </Tabs>
           </AppBar>
           <div
-            className={`${classes.panelBody} ${shrinkTabContent}`}
+            className={classNames(
+              {
+                [classes.panelBody]: !noPadding
+              },
+              shrinkTabContent
+            )}
             data-qa-tab-body
           >
             {render(rest)}

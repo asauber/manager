@@ -12,9 +12,9 @@ import EntityIcon from 'src/components/EntityIcon';
 import Grid from 'src/components/Grid';
 import LinearProgress from 'src/components/LinearProgress';
 import TableCell from 'src/components/TableCell';
-import TagsCell from 'src/components/TagsCell';
 import { formatRegion } from 'src/utilities';
 import VolumesActionMenu from './VolumesActionMenu';
+import { ExtendedVolume } from './VolumesLanding';
 
 type ClassNames =
   | 'root'
@@ -25,7 +25,8 @@ type ClassNames =
   | 'sizeCol'
   | 'pathCol'
   | 'volumesWrapper'
-  | 'linodeVolumesWrapper';
+  | 'linodeVolumesWrapper'
+  | 'systemPath';
 
 const styles: StyleRulesCallback<ClassNames> = theme => ({
   root: {},
@@ -70,11 +71,14 @@ const styles: StyleRulesCallback<ClassNames> = theme => ({
   pathCol: {
     width: '25%',
     minWidth: 250
+  },
+  systemPath: {
+    wordBreak: 'break-all'
   }
 });
 
 interface Props {
-  volume: any;
+  volume: ExtendedVolume;
   isUpdating: boolean;
   isVolumesLanding: boolean;
   openForEdit: (
@@ -95,8 +99,12 @@ interface Props {
   ) => void;
   openForConfig: (volumeLabel: string, volumePath: string) => void;
   handleAttach: (volumeId: number, label: string, regionID: string) => void;
-  handleDetach: (volumeId: number) => void;
-  handleDelete: (volumeId: number) => void;
+  handleDetach: (
+    volumeId: number,
+    volumeLabel: string,
+    linodeLabel: string
+  ) => void;
+  handleDelete: (volumeId: number, volumeLabel: string) => void;
 }
 
 type CombinedProps = Props & WithStyles<ClassNames>;
@@ -113,7 +121,9 @@ const progressFromEvent = (e?: Linode.Event) => {
   return undefined;
 };
 
-const VolumeTableRow: React.StatelessComponent<CombinedProps> = props => {
+export const VolumeTableRow: React.StatelessComponent<
+  CombinedProps
+> = props => {
   const {
     classes,
     isUpdating,
@@ -147,14 +157,13 @@ const VolumeTableRow: React.StatelessComponent<CombinedProps> = props => {
           </Grid>
           <Grid item>
             <div className={classes.labelStatusWrapper}>
-              <Typography role="header" variant="h3" data-qa-label>
+              <Typography variant="h3" data-qa-label>
                 {label}
               </Typography>
             </div>
           </Grid>
         </Grid>
       </TableCell>
-      <TagsCell tags={volume.tags} />
       <TableCell colSpan={5}>
         <LinearProgress value={progressFromEvent(volume.recentEvent)} />
       </TableCell>
@@ -172,14 +181,13 @@ const VolumeTableRow: React.StatelessComponent<CombinedProps> = props => {
           </Grid>
           <Grid item>
             <div className={classes.labelStatusWrapper}>
-              <Typography role="header" variant="h3" data-qa-label>
+              <Typography variant="h3" data-qa-label>
                 {volume.label}
               </Typography>
             </div>
           </Grid>
         </Grid>
       </TableCell>
-      <TagsCell tags={volume.tags} />
       {isVolumesLanding && (
         <TableCell parentColumn="Region" data-qa-volume-region>
           {region}
@@ -188,7 +196,11 @@ const VolumeTableRow: React.StatelessComponent<CombinedProps> = props => {
       <TableCell parentColumn="Size" data-qa-volume-size>
         {size} GiB
       </TableCell>
-      <TableCell parentColumn="File System Path" data-qa-fs-path>
+      <TableCell
+        parentColumn="File System Path"
+        data-qa-fs-path
+        className={classes.systemPath}
+      >
         {filesystemPath}
       </TableCell>
       {isVolumesLanding && (
@@ -196,13 +208,15 @@ const VolumeTableRow: React.StatelessComponent<CombinedProps> = props => {
           parentColumn="Attached To"
           data-qa-volume-cell-attachment={volume.linodeLabel}
         >
-          {volume.linodeLabel && (
+          {volume.linodeLabel ? (
             <Link
               to={`/linodes/${volume.linode_id}`}
               className="link secondaryLink"
             >
               {volume.linodeLabel}
             </Link>
+          ) : (
+            <Typography>Unattached</Typography>
           )}
         </TableCell>
       )}
@@ -210,7 +224,7 @@ const VolumeTableRow: React.StatelessComponent<CombinedProps> = props => {
         <VolumesActionMenu
           onShowConfig={openForConfig}
           filesystemPath={filesystemPath}
-          linodeLabel={volume.linodeLabel}
+          linodeLabel={volume.linodeLabel || ''}
           regionID={regionID}
           volumeId={volume.id}
           volumeTags={volume.tags}
@@ -219,7 +233,14 @@ const VolumeTableRow: React.StatelessComponent<CombinedProps> = props => {
           onEdit={openForEdit}
           onResize={openForResize}
           onClone={openForClone}
-          attached={Boolean(volume.linode_id)}
+          volumeLabel={volume.label}
+          /**
+           * This is a safer check than volume.linode_id (see logic in addAttachedLinodeInfoToVolume() from VolumesLanding)
+           * as it actually checks to see if the Linode exists before adding linodeLabel and linodeStatus.
+           * This avoids a bug (M3-2534) where a Volume attached to a just-deleted Linode
+           * could sometimes get tagged as "attached" here.
+           */
+          attached={Boolean(volume.linodeLabel)}
           onAttach={handleAttach}
           onDetach={handleDetach}
           poweredOff={volume.linodeStatus === 'offline'}

@@ -1,4 +1,4 @@
-import { compose, pathOr, range, take, takeLast } from 'ramda';
+import { compose, range, take, takeLast } from 'ramda';
 import * as React from 'react';
 import NumberFormat from 'react-number-format';
 import ActionsPanel from 'src/components/ActionsPanel';
@@ -10,13 +10,14 @@ import {
   WithStyles
 } from 'src/components/core/styles';
 import Typography from 'src/components/core/Typography';
+import Select, { Item } from 'src/components/EnhancedSelect/Select';
 import ExpansionPanel from 'src/components/ExpansionPanel';
 import Grid from 'src/components/Grid';
-import MenuItem from 'src/components/MenuItem';
 import Notice from 'src/components/Notice';
 import TextField from 'src/components/TextField';
 import { withAccount } from 'src/features/Billing/context';
 import { saveCreditCard } from 'src/services/account';
+import { getAPIErrorOrDefault } from 'src/utilities/errorUtils';
 import getAPIErrorFor from 'src/utilities/getAPIErrorFor';
 import isCreditCardExpired from 'src/utilities/isCreditCardExpired';
 
@@ -88,12 +89,12 @@ class UpdateCreditCardPanel extends React.Component<CombinedProps, State> {
     });
   };
 
-  handleExpiryMonthChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    this.setState({ expiry_month: +e.target.value });
+  handleExpiryMonthChange = (e: Item<string>) => {
+    this.setState({ expiry_month: +e.value });
   };
 
-  handleExpiryYearChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    this.setState({ expiry_year: +e.target.value });
+  handleExpiryYearChange = (e: Item<string>) => {
+    this.setState({ expiry_year: +e.value });
   };
 
   submitForm = () => {
@@ -121,11 +122,7 @@ class UpdateCreditCardPanel extends React.Component<CombinedProps, State> {
       .catch(error => {
         this.setState({
           submitting: false,
-          errors: pathOr(
-            [{ reason: 'Unable to update credit card.' }],
-            ['response', 'data', 'errors'],
-            error
-          )
+          errors: getAPIErrorOrDefault(error, 'Unable to update credit card.')
         });
       });
   };
@@ -171,17 +168,23 @@ class UpdateCreditCardPanel extends React.Component<CombinedProps, State> {
     );
     const generalError = hasErrorFor('none');
 
+    const defaultMonth = UpdateCreditCardPanel.monthMenuItems.find(
+      eachMonth => {
+        return eachMonth.value === this.state.expiry_month;
+      }
+    );
+
+    const defaultYear = UpdateCreditCardPanel.yearMenuItems.find(eachYear => {
+      return eachYear.value === this.state.expiry_year;
+    });
+
     return (
       <ExpansionPanel heading="Update Credit Card" actions={this.renderActions}>
         <Grid container>
           {last_four && (
             <Grid item xs={12}>
               <div className={classes.currentccContainer}>
-                <Typography
-                  role="header"
-                  variant="h2"
-                  className={classes.currentCCTitle}
-                >
+                <Typography variant="h2" className={classes.currentCCTitle}>
                   Current Credit Card
                 </Typography>
                 <Grid container>
@@ -206,9 +209,7 @@ class UpdateCreditCardPanel extends React.Component<CombinedProps, State> {
           )}
           <Grid item xs={12}>
             <div className={classes.newccContainer}>
-              <Typography role="header" variant="h2">
-                New Credit Card
-              </Typography>
+              <Typography variant="h2">New Credit Card</Typography>
               {generalError && (
                 <Notice error spacingTop={24} spacingBottom={8}>
                   {generalError}
@@ -235,29 +236,25 @@ class UpdateCreditCardPanel extends React.Component<CombinedProps, State> {
                 </Grid>
 
                 <Grid item className={classes.fullWidthMobile}>
-                  <TextField
-                    required
-                    select
+                  <Select
+                    options={UpdateCreditCardPanel.monthMenuItems}
                     label="Expiration Month"
-                    value={this.state.expiry_month}
+                    defaultValue={defaultMonth}
                     onChange={this.handleExpiryMonthChange}
                     errorText={hasErrorFor('expiry_month')}
-                  >
-                    {UpdateCreditCardPanel.monthMenuItems}
-                  </TextField>
+                    isClearable={false}
+                  />
                 </Grid>
 
                 <Grid item className={classes.fullWidthMobile}>
-                  <TextField
-                    required
-                    select
+                  <Select
+                    options={UpdateCreditCardPanel.yearMenuItems}
                     label="Expiration Year"
-                    value={this.state.expiry_year}
+                    defaultValue={defaultYear}
                     onChange={this.handleExpiryYearChange}
                     errorText={hasErrorFor('expiry_year')}
-                  >
-                    {UpdateCreditCardPanel.yearMenuItems}
-                  </TextField>
+                    isClearable={false}
+                  />
                 </Grid>
               </Grid>
             </div>
@@ -287,17 +284,14 @@ class UpdateCreditCardPanel extends React.Component<CombinedProps, State> {
   static yearMenuItems = range(
     UpdateCreditCardPanel.currentYear,
     UpdateCreditCardPanel.currentYear + 20
-  ).map((v: number) => (
-    <MenuItem key={v} value={v}>
-      {v}
-    </MenuItem>
-  ));
+  ).map((v: any) => {
+    return { label: v, value: v };
+  });
 
-  static monthMenuItems = range(1, 13).map((v: number) => (
-    <MenuItem key={v} value={v}>
-      {String(v).padStart(2, '0')}
-    </MenuItem>
-  ));
+  static monthMenuItems = range(1, 13).map((v: any) => {
+    const label = String(v).padStart(2, '0');
+    return { label, value: v };
+  });
 }
 
 const styled = withStyles(styles);

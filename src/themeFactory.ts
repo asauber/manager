@@ -44,6 +44,8 @@ declare module '@material-ui/core/styles/createMuiTheme' {
     '@keyframes dash': any;
     bg: any;
     color: any;
+    visually: any;
+    font?: any;
     animateCircleIcon?: any;
     notificationList: any;
     status: any;
@@ -55,6 +57,8 @@ declare module '@material-ui/core/styles/createMuiTheme' {
     '@keyframes dash'?: any;
     bg?: any;
     color?: any;
+    visually?: any;
+    font?: any;
     animateCircleIcon?: any;
     notificationList?: any;
     status?: any;
@@ -69,6 +73,9 @@ interface ThemeArguments {
 
 const breakpoints = createBreakpoints({});
 
+export const COMPACT_SPACING_UNIT = 4;
+export const NORMAL_SPACING_UNIT = 8;
+
 const primaryColors = {
   main: '#3683dc',
   light: '#4d99f1',
@@ -78,6 +85,11 @@ const primaryColors = {
   divider: '#f4f4f4',
   offBlack: '#444',
   white: '#fff'
+};
+
+const primaryFonts = {
+  normal: '"LatoWeb", sans-serif',
+  bold: '"LatoWebBold", sans-serif'
 };
 
 const iconCircleAnimation = {
@@ -97,8 +109,27 @@ const iconCircleAnimation = {
   }
 };
 
+const visuallyVisible = {
+  /* https://snook.ca/archives/html_and_css/hiding-content-for-accessibility */
+  position: 'relative',
+  height: 'auto',
+  width: 'auto',
+  overflow: 'initial',
+  clip: 'none'
+};
+
+const visuallyHidden = {
+  /* https://snook.ca/archives/html_and_css/hiding-content-for-accessibility */
+  position: 'absolute !important',
+  height: 1,
+  width: 1,
+  overflow: 'hidden',
+  clip: 'rect(1px, 1px, 1px, 1px)'
+};
+
 const themeDefaults: ThemeDefaults = (options: ThemeArguments) => {
-  const spacingUnit = options.spacing === 'compact' ? 4 : 8;
+  const spacingUnit =
+    options.spacing === 'compact' ? COMPACT_SPACING_UNIT : NORMAL_SPACING_UNIT;
 
   return {
     breakpoints,
@@ -171,6 +202,7 @@ const themeDefaults: ThemeDefaults = (options: ThemeArguments) => {
       black: '#222',
       offBlack: primaryColors.offBlack,
       boxShadow: '#ddd',
+      boxShadowDark: '#aaa',
       focusBorder: '#999',
       absWhite: '#fff',
       blueDTwhite: '#3683dc',
@@ -182,6 +214,10 @@ const themeDefaults: ThemeDefaults = (options: ThemeArguments) => {
       drawerBackdrop: 'rgba(255, 255, 255, 0.5)',
       label: '#555',
       disabledText: '#c9cacb'
+    },
+    font: {
+      normal: primaryFonts.normal,
+      bold: spacingUnit === 4 ? primaryFonts.normal : primaryFonts.bold
     },
     animateCircleIcon: {
       ...iconCircleAnimation
@@ -211,13 +247,13 @@ const themeDefaults: ThemeDefaults = (options: ThemeArguments) => {
     },
     typography: {
       useNextVariants: true,
-      fontFamily: '"LatoWeb", sans-serif',
+      fontFamily: primaryFonts.normal,
       fontSize: 16,
       h1: {
         color: primaryColors.headline,
         fontSize: '1.25rem',
         lineHeight: '1.75rem',
-        fontFamily: 'LatoWebBold',
+        fontFamily: primaryFonts.bold,
         [breakpoints.up('lg')]: {
           fontSize: '1.5rem',
           lineHeight: '1.875rem'
@@ -226,13 +262,13 @@ const themeDefaults: ThemeDefaults = (options: ThemeArguments) => {
       h2: {
         color: primaryColors.headline,
         fontSize: '1.125rem',
-        fontFamily: 'LatoWebBold',
+        fontFamily: spacingUnit === 4 ? primaryFonts.normal : primaryFonts.bold,
         lineHeight: '1.5rem'
       },
       h3: {
         color: primaryColors.headline,
         fontSize: '1rem',
-        fontFamily: 'LatoWebBold',
+        fontFamily: spacingUnit === 4 ? primaryFonts.normal : primaryFonts.bold,
         lineHeight: '1rem'
       },
       body1: {
@@ -256,7 +292,15 @@ const themeDefaults: ThemeDefaults = (options: ThemeArguments) => {
           fontSize: '2.5rem',
           lineHeight: '2.5rem'
         }
+      },
+      subtitle1: {
+        fontSize: '1.075rem',
+        lineHeight: '1.5rem'
       }
+    },
+    visually: {
+      visible: visuallyVisible,
+      hidden: visuallyHidden
     },
     overrides: {
       MuiAppBar: {
@@ -278,7 +322,8 @@ const themeDefaults: ThemeDefaults = (options: ThemeArguments) => {
           borderRadius: 0,
           fontSize: '1rem',
           lineHeight: 1,
-          fontFamily: 'LatoWebBold',
+          fontFamily:
+            spacingUnit === 4 ? primaryFonts.normal : primaryFonts.bold,
           color: primaryColors.main,
           padding: `${spacingUnit * 2}px ${spacingUnit * 3 +
             spacingUnit / 2}px ${spacingUnit * 2}px`,
@@ -612,10 +657,19 @@ const themeDefaults: ThemeDefaults = (options: ThemeArguments) => {
           marginLeft: -(spacingUnit + 3)
         }
       },
+      MuiFormGroup: {
+        root: {
+          '&[role="radiogroup"]': {
+            marginTop: spacingUnit,
+            marginBottom: spacingUnit * 2
+          }
+        }
+      },
       MuiFormLabel: {
         root: {
           color: '#555',
-          fontFamily: 'LatoWebBold',
+          fontFamily:
+            spacingUnit === 4 ? primaryFonts.normal : primaryFonts.bold,
           fontSize: '.9rem',
           marginBottom: 2,
           '&$focused': {
@@ -773,10 +827,9 @@ const themeDefaults: ThemeDefaults = (options: ThemeArguments) => {
             backgroundColor: 'transparent',
             color: primaryColors.main
           },
-
           '&.selectHeader': {
             opacity: 1,
-            fontFamily: 'LatoWebBold',
+            fontFamily: primaryFonts.bold,
             fontSize: '1rem',
             color: primaryColors.text
           }
@@ -821,7 +874,7 @@ const themeDefaults: ThemeDefaults = (options: ThemeArguments) => {
       MuiMenuItem: {
         root: {
           height: 'auto',
-          fontFamily: 'LatoWeb',
+          fontFamily: primaryFonts.normal,
           fontSize: '.9rem',
           whiteSpace: 'initial',
           textOverflow: 'initial',
@@ -844,6 +897,87 @@ const themeDefaults: ThemeDefaults = (options: ThemeArguments) => {
         selected: {}
       },
       MuiPaper: {
+        root: {
+          '& pre': {
+            backgroundColor: '#eee',
+            padding: '8px',
+            fontSize: '1rem',
+            overflowX: 'auto'
+          },
+          '& span.hljs-comment, & span.hljs-quote': {
+            color: '#655f6d'
+          },
+          [`
+            & span.hljs-variable, 
+            & span.hljs-template-variable,
+            & span.hljs-attribute,
+            & span.hljs-tag,
+            & span.hljs-name,
+            & span.hljs-regexp
+            & span.hljs-link,
+            & span.hljs-selector-id,
+            & span.hljs-selector-class
+          `]: {
+            color: '#be4678'
+          },
+          [`
+            & span.hljs-number,
+            & span.hljs-meta,
+            & span.hljs-built_in,
+            & span.hljs-butonin-name,
+            & span.hljs-literal,
+            & span.hljs-type,
+            & span.hljs-params
+          `]: {
+            color: '#aa573c'
+          },
+          [`
+            & span.hljs-string,
+            & span.hljs-symbol,
+            & span.hljs-bullet
+          `]: {
+            color: '#2a9292'
+          },
+          [`
+            & span.hljs-title,
+            & span.hljs-section
+          `]: {
+            color: '#576ddb'
+          },
+          [`
+            & span.hljs-keyword,
+            & span.hljs-selector-tag
+          `]: {
+            color: '#955ae7'
+          },
+          [`
+            & span.hljs-deletion,
+            & span.hljs-addition
+          `]: {
+            color: '#19171c',
+            display: 'inline-block',
+            width: '100%'
+          },
+          '& span.hljs-deletion': {
+            backgroundColor: '#be4678'
+          },
+          '& span.hljs-addition': {
+            backgroundColor: '#2a9292'
+          },
+          '& span.hljs': {
+            display: 'block',
+            overflowX: 'auto',
+            background: '#efecf4',
+            color: `#585260`,
+            padding: '0.5em'
+          },
+          '& span.hljs-emphasis': {
+            fontStyle: 'italic'
+          },
+          '& span.hljs-strong': {
+            fontWeight: 'bold'
+          }
+        },
         rounded: {
           borderRadius: 0
         }
@@ -1016,7 +1150,7 @@ const themeDefaults: ThemeDefaults = (options: ThemeArguments) => {
             minWidth: 75
           },
           '&$selected, &$selected:hover': {
-            fontFamily: 'LatoWebBold',
+            fontFamily: primaryFonts.bold,
             color: primaryColors.headline
           },
           '&:hover': {
@@ -1052,6 +1186,11 @@ const themeDefaults: ThemeDefaults = (options: ThemeArguments) => {
           borderBottom: `2px solid ${primaryColors.divider}`,
           '&:last-child': {
             paddingRight: spacingUnit + 2
+          },
+          '& .action-menu': {
+            [breakpoints.down('sm')]: {
+              width: '100%'
+            }
           }
         },
         head: {
@@ -1076,6 +1215,16 @@ const themeDefaults: ThemeDefaults = (options: ThemeArguments) => {
             position: 'absolute',
             bottom: 6,
             zIndex: 2,
+            left: -9,
+            '& svg': {
+              backgroundColor: 'rgba(232, 232, 232, .9)',
+              height: 39,
+              width: 38,
+              padding: '7px 4px',
+              borderRadius: '50%'
+            }
+          },
+          '& $scrollButtons:last-child': {
             '& svg': {
               backgroundColor: 'rgba(232, 232, 232, .9)',
               height: 39,
@@ -1107,11 +1256,11 @@ const themeDefaults: ThemeDefaults = (options: ThemeArguments) => {
           '&:before': {
             borderLeftColor: 'white'
           },
-          '&:hover': {
+          '&:hover, &:focus': {
             '&$hover': {
               backgroundColor: '#fbfbfb',
               '&:before': {
-                backgroundColor: primaryColors.main
+                borderLeftColor: primaryColors.main
               }
             }
           }
@@ -1153,6 +1302,12 @@ const themeDefaults: ThemeDefaults = (options: ThemeArguments) => {
         icon: {
           opacity: 1,
           marginTop: 2
+        },
+        iconDirectionDesc: {
+          transform: 'rotate(180deg)'
+        },
+        iconDirectionAsc: {
+          transform: 'rotate(0deg)'
         }
       },
       MuiTooltip: {

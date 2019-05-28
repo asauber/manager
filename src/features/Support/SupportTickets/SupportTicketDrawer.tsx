@@ -1,8 +1,9 @@
 import * as Bluebird from 'bluebird';
-import { compose, lensPath, pathOr, set } from 'ramda';
+import { compose, lensPath, set } from 'ramda';
 import * as React from 'react';
 import ActionsPanel from 'src/components/ActionsPanel';
 import Button from 'src/components/Button';
+import FormHelperText from 'src/components/core/FormHelperText';
 import {
   StyleRulesCallback,
   withStyles,
@@ -10,8 +11,8 @@ import {
 } from 'src/components/core/styles';
 import Typography from 'src/components/core/Typography';
 import Drawer from 'src/components/Drawer';
-import EnhancedSelect, { Item } from 'src/components/EnhancedSelect';
-import MenuItem from 'src/components/MenuItem';
+import Select, { Item } from 'src/components/EnhancedSelect/Select';
+import ExpansionPanel from 'src/components/ExpansionPanel';
 import Notice from 'src/components/Notice';
 import SectionErrorBoundary from 'src/components/SectionErrorBoundary';
 import TextField from 'src/components/TextField';
@@ -21,13 +22,28 @@ import { getNodeBalancers } from 'src/services/nodebalancers';
 import { createSupportTicket, uploadAttachment } from 'src/services/support';
 import { getVolumes } from 'src/services/volumes';
 import composeState from 'src/utilities/composeState';
-import { getErrorMap } from 'src/utilities/errorUtils';
+import {
+  getAPIErrorOrDefault,
+  getErrorMap,
+  getErrorStringOrDefault
+} from 'src/utilities/errorUtils';
 import { getVersionString } from 'src/utilities/getVersionString';
-import AttachFileForm, { FileAttachment } from '../AttachFileForm';
+import AttachFileForm from '../AttachFileForm';
+import { FileAttachment } from '../index';
 import { AttachmentError } from '../SupportTicketDetail/SupportTicketDetail';
-import { reshapeFiles } from '../ticketUtils';
 
-type ClassNames = 'root' | 'suffix' | 'actionPanel';
+import scrollErrorIntoView from 'src/utilities/scrollErrorIntoView';
+import Reference from '../SupportTicketDetail/TabbedReply/MarkdownReference';
+import TabbedReply from '../SupportTicketDetail/TabbedReply/TabbedReply';
+
+type ClassNames =
+  | 'root'
+  | 'suffix'
+  | 'actionPanel'
+  | 'expPanelSummary'
+  | 'innerReply'
+  | 'rootReply'
+  | 'reference';
 
 const styles: StyleRulesCallback<ClassNames> = theme => ({
   root: {},
@@ -37,6 +53,22 @@ const styles: StyleRulesCallback<ClassNames> = theme => ({
   },
   actionPanel: {
     marginTop: theme.spacing.unit * 2
+  },
+  expPanelSummary: {
+    backgroundColor: theme.bg.offWhite,
+    borderTop: `1px solid ${theme.bg.main}`
+  },
+  innerReply: {
+    padding: 0
+  },
+  rootReply: {
+    padding: 0,
+    marginBottom: theme.spacing.unit * 2
+  },
+  reference: {
+    '& > p': {
+      marginBottom: theme.spacing.unit
+    }
   }
 });
 
@@ -101,11 +133,6 @@ const entityIdtoNameMap = {
   nodebalancer_id: 'NodeBalancer'
 };
 
-const text = {
-  placeholder:
-    "Tell us more about the trouble you're having and any steps you've already taken to resolve it."
-};
-
 export class SupportTicketDrawer extends React.Component<CombinedProps, State> {
   mounted: boolean = false;
   composeState = composeState;
@@ -155,11 +182,9 @@ export class SupportTicketDrawer extends React.Component<CombinedProps, State> {
   };
 
   handleCatch = (errors: Linode.ApiFieldError[]) => {
-    const err: Linode.ApiFieldError[] = [
-      { field: 'none', reason: 'An unexpected error has ocurred.' }
-    ];
+    // @todo replace with LinodeAPIFieldError[] when/if we return that from services
     this.setState({
-      errors: pathOr(err, ['response', 'data', 'errors'], errors),
+      errors,
       loading: false
     });
   };
@@ -216,20 +241,17 @@ export class SupportTicketDrawer extends React.Component<CombinedProps, State> {
     this.setState(set(L.summary, e.target.value));
   };
 
-  handleDescriptionInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    this.composeState([
-      set(L.description, e.target.value),
-      set(L.errors, undefined)
-    ]);
+  handleDescriptionInputChange = (value: string) => {
+    this.composeState([set(L.description, value), set(L.errors, undefined)]);
   };
 
-  handleEntityTypeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+  handleEntityTypeChange = (e: Item<string>) => {
     // Don't reset things if the type hasn't changed
-    if (this.state.ticket.entity_type === e.target.value) {
+    if (this.state.ticket.entity_type === e.value) {
       return;
     }
     this.composeState([
-      set(L.entity_type, e.target.value),
+      set(L.entity_type, e.value),
       set(L.entity_id, undefined),
       set(L.inputValue, ''),
       set(L.data, []),
@@ -269,14 +291,6 @@ export class SupportTicketDrawer extends React.Component<CombinedProps, State> {
     this.setState({ inputValue });
   };
 
-  handleFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { files } = e.target;
-    if (files && files.length) {
-      const reshapedFiles = reshapeFiles(files);
-      this.setState(set(L.files, [...this.state.files, ...reshapedFiles]));
-    }
-  };
-
   updateFiles = (files: FileAttachment[]) => {
     this.setState(set(L.files, files));
   };
@@ -301,18 +315,15 @@ export class SupportTicketDrawer extends React.Component<CombinedProps, State> {
         );
         return accumulator;
       })
-      .catch((attachmentErrors: Linode.ApiFieldError[]) => {
+      .catch(attachmentErrors => {
         /*
          * Note! We want the first few uploads to succeed even if the last few
          * fail! Don't try to aggregate errors!
          */
         this.setState(set(lensPath(['files', idx, 'uploading']), false));
-        const error =
-          'There was an error attaching this file. Please try again.';
-        const newError = pathOr<string>(
-          error,
-          ['response', 'data', 'errors', 0, 'reason'],
-          attachmentErrors
+        const newError = getErrorStringOrDefault(
+          attachmentErrors,
+          'There was an error attaching this file. Please try again.'
         );
         return {
           ...accumulator,
@@ -400,27 +411,24 @@ export class SupportTicketDrawer extends React.Component<CombinedProps, State> {
         if (!this.mounted) {
           return;
         }
-        const err: Linode.ApiFieldError[] = [
-          { reason: 'An unexpected error has ocurred.' }
-        ];
-        this.setState({
-          errors: pathOr(err, ['response', 'data', 'errors'], errors),
-          submitting: false
-        });
+        this.setState(
+          {
+            errors: getAPIErrorOrDefault(errors),
+            submitting: false
+          },
+          () => scrollErrorIntoView()
+        );
       });
   };
 
   renderEntityTypes = () => {
-    return Object.keys(entityMap).map((key: string, idx: number) => {
-      return (
-        <MenuItem key={idx} value={entityMap[key]}>
-          {key}
-        </MenuItem>
-      );
+    return Object.keys(entityMap).map((key: string) => {
+      return { label: key, value: entityMap[key] };
     });
   };
 
   render() {
+    const { classes } = this.props;
     const { data, errors, files, inputValue, submitting, ticket } = this.state;
     const requirementsMet =
       ticket.description.length > 0 && ticket.summary.length > 0;
@@ -435,6 +443,15 @@ export class SupportTicketDrawer extends React.Component<CombinedProps, State> {
     const inputError = hasErrorFor.input;
 
     const hasNoEntitiesMessage = this.getHasNoEntitiesMessage();
+
+    const topicOptions = [
+      ...this.renderEntityTypes(),
+      { label: 'None/General', value: 'general' }
+    ];
+
+    const defaultTopic = topicOptions.find(eachTopic => {
+      return eachTopic.value === ticket.entity_type;
+    });
 
     return (
       <Drawer
@@ -451,36 +468,35 @@ export class SupportTicketDrawer extends React.Component<CombinedProps, State> {
           <a href="https://status.linode.com">status.linode.com</a>.
         </Typography>
 
-        <TextField
-          select
+        <Select
+          options={topicOptions}
           label="What is this regarding?"
-          value={ticket.entity_type}
+          defaultValue={defaultTopic}
           onChange={this.handleEntityTypeChange}
           data-qa-ticket-entity-type
-        >
-          <MenuItem key={'none'} value={'none'}>
-            Choose a Product
-          </MenuItem>
-          {this.renderEntityTypes()}
-          <MenuItem key={'general'} value={'general'}>
-            None/General
-          </MenuItem>
-        </TextField>
+          placeholder="Choose a Product"
+          isClearable={false}
+        />
 
         {!['none', 'general'].includes(ticket.entity_type) && (
-          <EnhancedSelect
-            options={data}
-            value={ticket.entity_id}
-            handleSelect={this.handleEntityIDChange}
-            disabled={data.length === 0}
-            errorText={inputError}
-            helperText={hasNoEntitiesMessage}
-            placeholder={`Select a ${entityIdtoNameMap[ticket.entity_type]}`}
-            label={entityIdtoNameMap[ticket.entity_type]}
-            inputValue={inputValue}
-            onInputValueChange={this.onInputValueChange}
-            data-qa-ticket-entity-id
-          />
+          <>
+            <Select
+              options={data}
+              defaultValue={ticket.entity_id}
+              disabled={data.length === 0}
+              errorText={inputError}
+              placeholder={`Select a ${entityIdtoNameMap[ticket.entity_type]}`}
+              label={entityIdtoNameMap[ticket.entity_type]}
+              inputValue={inputValue}
+              onChange={this.handleEntityIDChange}
+              onInputChange={this.onInputValueChange}
+              data-qa-ticket-entity-id
+              isClearable={false}
+            />
+            {hasNoEntitiesMessage && (
+              <FormHelperText>{hasNoEntitiesMessage}</FormHelperText>
+            )}
+          </>
         )}
 
         <TextField
@@ -491,27 +507,28 @@ export class SupportTicketDrawer extends React.Component<CombinedProps, State> {
           errorText={summaryError}
           data-qa-ticket-summary
         />
-
-        <TextField
-          label="Description"
-          required
-          multiline
-          rows={4}
+        <TabbedReply
+          error={descriptionError}
+          handleChange={this.handleDescriptionInputChange}
           value={ticket.description}
-          onChange={this.handleDescriptionInputChange}
-          placeholder={text.placeholder}
-          errorText={descriptionError}
-          data-qa-ticket-description
+          innerClass={this.props.classes.innerReply}
+          rootClass={this.props.classes.rootReply}
+          placeholder={
+            "Tell us more about the trouble you're having and any steps you've already taken to resolve it."
+          }
         />
-
         {/* <TicketAttachmentList attachments={attachments} /> */}
+        <ExpansionPanel
+          heading="Formatting Tips"
+          detailProps={{ className: classes.expPanelSummary }}
+        >
+          <Reference rootClass={this.props.classes.reference} />
+        </ExpansionPanel>
         <AttachFileForm
           inlineDisplay
           files={files}
-          handleFileSelected={this.handleFileSelected}
           updateFiles={this.updateFiles}
         />
-
         <ActionsPanel style={{ marginTop: 16 }}>
           <Button
             onClick={this.onSubmit}

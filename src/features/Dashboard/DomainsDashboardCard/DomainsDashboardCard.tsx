@@ -1,7 +1,6 @@
 import { compose, prop, sortBy, take } from 'ramda';
 import * as React from 'react';
 import { connect } from 'react-redux';
-import { Link } from 'react-router-dom';
 import Paper from 'src/components/core/Paper';
 import {
   StyleRulesCallback,
@@ -18,13 +17,14 @@ import TableRow from 'src/components/TableRow';
 import TableRowEmptyState from 'src/components/TableRowEmptyState';
 import TableRowError from 'src/components/TableRowError';
 import TableRowLoading from 'src/components/TableRowLoading';
+import ViewAllLink from 'src/components/ViewAllLink';
 import { ApplicationState } from 'src/store';
+import { openForEditing } from 'src/store/domainDrawer';
 import {
   isEntityEvent,
   isInProgressEvent
 } from 'src/store/events/event.helpers';
 import DashboardCard from '../DashboardCard';
-import ViewAllLink from '../ViewAllLink';
 
 type ClassNames =
   | 'root'
@@ -68,7 +68,9 @@ interface State {
   results?: number;
 }
 
-type CombinedProps = WithStyles<ClassNames> & WithUpdatingDomainsProps;
+type CombinedProps = WithStyles<ClassNames> &
+  WithUpdatingDomainsProps &
+  DispatchProps;
 
 class DomainsDashboardCard extends React.Component<CombinedProps, State> {
   render() {
@@ -81,6 +83,18 @@ class DomainsDashboardCard extends React.Component<CombinedProps, State> {
         </Paper>
       </DashboardCard>
     );
+  }
+
+  handleRowClick(
+    e: React.MouseEvent<HTMLAnchorElement, MouseEvent>,
+    id: number,
+    domain: string,
+    type: string
+  ) {
+    if (type === 'slave') {
+      e.preventDefault();
+      this.props.openForEditing(domain, id);
+    }
   }
 
   renderAction = () =>
@@ -125,31 +139,28 @@ class DomainsDashboardCard extends React.Component<CombinedProps, State> {
     return data.map(({ id, domain, type, status }) => (
       <TableRow key={domain} rowLink={`/domains/${id}/records`}>
         <TableCell className={classes.labelCol}>
-          <Link to={`/domains/${id}/records`} className={'black nu block'}>
-            <Grid container wrap="nowrap" alignItems="center">
-              <Grid item className="py0">
-                <EntityIcon
-                  variant="domain"
-                  status={status}
-                  marginTop={1}
-                  loading={status === 'edit_mode'}
-                />
-              </Grid>
-              <Grid item className={classes.labelGridWrapper}>
-                <div className={classes.labelStatusWrapper}>
-                  <Typography
-                    role="header"
-                    variant="h3"
-                    className={classes.wrapHeader}
-                    data-qa-label
-                  >
-                    {domain}
-                  </Typography>
-                </div>
-                <Typography className={classes.description}>{type}</Typography>
-              </Grid>
+          <Grid container wrap="nowrap" alignItems="center">
+            <Grid item className="py0">
+              <EntityIcon
+                variant="domain"
+                status={status}
+                marginTop={1}
+                loading={status === 'edit_mode'}
+              />
             </Grid>
-          </Link>
+            <Grid item className={classes.labelGridWrapper}>
+              <div className={classes.labelStatusWrapper}>
+                <Typography
+                  variant="h3"
+                  className={classes.wrapHeader}
+                  data-qa-label
+                >
+                  {domain}
+                </Typography>
+              </div>
+              <Typography className={classes.description}>{type}</Typography>
+            </Grid>
+          </Grid>
         </TableCell>
         <TableCell className={classes.actionsCol} />
       </TableRow>
@@ -203,7 +214,17 @@ const isWantedEvent = (e: Linode.Event): e is Linode.EntityEvent => {
   return false;
 };
 
+interface DispatchProps {
+  openForEditing: (domain: string, id: number) => void;
+}
+
+const connected = connect(
+  undefined,
+  { openForEditing }
+);
+
 const enhanced = compose(
+  connected,
   styled,
   withUpdatingDomains
 );

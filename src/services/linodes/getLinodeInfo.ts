@@ -4,9 +4,6 @@ import Request, { setMethod, setParams, setURL, setXFilter } from '../index';
 
 type Page<T> = Linode.ResourcePage<T>;
 type Type = Linode.LinodeType;
-type Stats = {
-  data: Linode.Stats;
-}
 
 /**
  * getLinodeStats
@@ -16,10 +13,10 @@ type Stats = {
  * @param linodeId { number } The id of the Linode to retrieve stats data for.
  */
 export const getLinodeStats = (linodeId: number) =>
-  Request<Stats>(
+  Request<Linode.Stats>(
     setURL(`${API_ROOT}/linode/instances/${linodeId}/stats`),
     setMethod('GET')
-  );
+  ).then(response => response.data);
 
 /**
  * getLinodeStats
@@ -37,10 +34,23 @@ export const getLinodeStatsByDate = (
   year: string,
   month: string
 ) =>
-  Request<Stats>(
+  Request<Linode.Stats>(
     setURL(`${API_ROOT}/linode/instances/${linodeId}/stats/${year}/${month}`),
     setMethod('GET')
-  );
+  ).then(response => response.data);
+
+/**
+ * getLinodeTransfer
+ *
+ * Returns current network transfer information for your Linode.
+ *
+ * @param linodeId { number } The id of the Linode to retrieve network transfer information for.
+ */
+export const getLinodeTransfer = (linodeId: number) =>
+  Request<Linode.NetworkUtilization>(
+    setURL(`${API_ROOT}/linode/instances/${linodeId}/transfer`),
+    setMethod('GET')
+  ).then(response => response.data);
 
 /**
  * getLinodeKernels

@@ -8,6 +8,7 @@ import {
   withStyles,
   WithStyles
 } from 'src/components/core/styles';
+import Tooltip from 'src/components/core/Tooltip';
 import Typography from 'src/components/core/Typography';
 import TagsPanel from 'src/components/TagsPanel';
 import styled, { StyleProps } from 'src/containers/SummaryPanels.styles';
@@ -21,6 +22,8 @@ import {
 import { formatRegion } from 'src/utilities';
 import { withLinodeDetailContext } from '../linodeDetailContext';
 import LinodeNetSummary from './LinodeNetSummary';
+
+import { getErrorStringOrDefault } from 'src/utilities/errorUtils';
 
 type ClassNames = 'region' | 'volumeLink' | 'regionInner';
 
@@ -92,24 +95,21 @@ class SummaryPanel extends React.Component<CombinedProps> {
     const {
       classes,
       linodeVolumes,
+      linodeVolumesError,
       linodeTags,
       linodeId,
       linodeRegion,
       linodeIpv4,
       linodeIpv6,
       backupsEnabled,
-      mostRecentBackup
+      mostRecentBackup,
+      readOnly
     } = this.props;
 
     return (
       <div className={classes.root}>
         <Paper className={classes.summarySection}>
-          <Typography
-            role="header"
-            variant="h3"
-            className={classes.title}
-            data-qa-title
-          >
+          <Typography variant="h3" className={classes.title} data-qa-title>
             Linode Details
           </Typography>
           <div className={classes.section}>{this.renderImage()}</div>
@@ -117,13 +117,19 @@ class SummaryPanel extends React.Component<CombinedProps> {
             className={classes.section}
             data-qa-volumes={linodeVolumes.length}
           >
-            Volumes:&#160;
-            <Link
-              className={classes.volumeLink}
-              to={`/linodes/${linodeId}/volumes`}
-            >
-              {linodeVolumes.length}
-            </Link>
+            <Typography>
+              Volumes:&#160;
+              {linodeVolumesError ? (
+                getErrorStringOrDefault(linodeVolumesError)
+              ) : (
+                <Link
+                  className={classes.volumeLink}
+                  to={`/linodes/${linodeId}/volumes`}
+                >
+                  {linodeVolumes.length}
+                </Link>
+              )}
+            </Typography>
           </div>
           <div className={`${classes.section}`}>
             {formatRegion(linodeRegion)}
@@ -133,30 +139,20 @@ class SummaryPanel extends React.Component<CombinedProps> {
           <LinodeNetSummary linodeId={linodeId} />
         </Paper>
         <Paper className={classes.summarySection}>
-          <Typography
-            role="header"
-            variant="h3"
-            className={classes.title}
-            data-qa-title
-          >
+          <Typography variant="h3" className={classes.title} data-qa-title>
             IP Addresses
           </Typography>
           <div className={classes.section}>
-            <IPAddress ips={linodeIpv4} copyRight showMore />
+            <IPAddress ips={linodeIpv4} copyRight showAll />
+            {linodeIpv6 && (
+              <div className={classes.section}>
+                <IPAddress ips={[linodeIpv6]} copyRight showAll />
+              </div>
+            )}
           </div>
-          {linodeIpv6 && (
-            <div className={classes.section}>
-              <IPAddress ips={[linodeIpv6]} copyRight showMore />
-            </div>
-          )}
         </Paper>
         <Paper className={classes.summarySection} style={{ paddingBottom: 24 }}>
-          <Typography
-            role="header"
-            variant="h3"
-            className={classes.title}
-            data-qa-title
-          >
+          <Typography variant="h3" className={classes.title} data-qa-title>
             Last Backup
           </Typography>
           <BackupStatus
@@ -166,15 +162,22 @@ class SummaryPanel extends React.Component<CombinedProps> {
           />
         </Paper>
         <Paper className={classes.summarySection}>
-          <Typography
-            role="header"
-            variant="h3"
-            className={classes.title}
-            data-qa-title
-          >
+          <Typography variant="h3" className={classes.title} data-qa-title>
             Tags
           </Typography>
-          <TagsPanel tags={linodeTags} updateTags={this.updateTags} />
+          {readOnly ? (
+            <Tooltip title="You don't have permission to modify this Linode">
+              <div>
+                <TagsPanel
+                  tags={linodeTags}
+                  updateTags={this.updateTags}
+                  disabled
+                />
+              </div>
+            </Tooltip>
+          ) : (
+            <TagsPanel tags={linodeTags} updateTags={this.updateTags} />
+          )}
         </Paper>
       </div>
     );
@@ -196,7 +199,9 @@ interface LinodeContextProps {
   linodeTags: string[];
   mostRecentBackup: string | null;
   linodeVolumes: Linode.Volume[];
+  linodeVolumesError?: Linode.ApiFieldError[];
   backupsEnabled: boolean;
+  readOnly: boolean;
 }
 
 const linodeContext = withLinodeDetailContext(({ linode }) => ({
@@ -207,7 +212,9 @@ const linodeContext = withLinodeDetailContext(({ linode }) => ({
   linodeTags: linode.tags,
   linodeId: linode.id,
   backupsEnabled: linode.backups.enabled,
-  linodeVolumes: linode._volumes
+  linodeVolumes: linode._volumes,
+  linodeVolumesError: linode._volumesError,
+  readOnly: linode._permissions === 'read_only'
 }));
 
 const enhanced = compose<CombinedProps, {}>(

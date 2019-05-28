@@ -22,6 +22,15 @@ const stackscript_data = array()
 //     otherwise: string().notRequired()
 //   });
 
+// Covers length and character requirements. Chain with other constraints using .concat().
+const rootPasswordValidation = string()
+  .min(6, 'Password must be between 6 and 128 characters.')
+  .max(128, 'Password must be between 6 and 128 characters.')
+  .matches(
+    /^(((?=.*[a-z])(?=.*[A-Z]))|((?=.*[a-z])(?=.*[0-9]))|((?=.*[A-Z])(?=.*[0-9]))|((?=.*[a-z])(?=.*[!"#$%&'()*+,-.\/:;<=>?@\[\]^_`{|}~\\]))|((?=.*[A-Z])(?=.*[!"#$%&'()*+,-.\/:;<=>?@\[\]^_`{|}~\\]))|((?=.*[0-9])(?=.*[!"#$%&'()*+,-.\/:;<=>?@\[\]^_`{|}~\\])))/,
+    'Password must contain at least 2 of the following classes: uppercase letters, lowercase letters, numbers, and punctuation.'
+  );
+
 export const ResizeLinodeDiskSchema = object({
   size: number()
     .required()
@@ -84,7 +93,21 @@ const schedule = object({
     'Invalid day value.'
   ),
   window: mixed().oneOf(
-    ['W0', 'W2', 'W4', 'W8', 'W10', 'W12', 'W14', 'W16', 'W18', 'W20', 'W22'],
+    [
+      'W0',
+      'W2',
+      'W4',
+      'W6',
+      'W8',
+      'W10',
+      'W12',
+      'W14',
+      'W16',
+      'W18',
+      'W20',
+      'W22',
+      'W24'
+    ],
     'Invalid schedule value.'
   )
 });
@@ -114,14 +137,21 @@ const SSHKeySchema = object({
   created: string()
 });
 
-export const RebuildLinodeSchema = object({
+// Include `shape()` here so that the schema can be extended without TS complaining.
+export const RebuildLinodeSchema = object().shape({
   image: string().required('An image is required.'),
-  root_pass: string().required('Password cannot be blank.'),
+  root_pass: string()
+    .required('Password cannot be blank.')
+    .concat(rootPasswordValidation),
   authorized_keys: array().of(SSHKeySchema),
   authorized_users: array().of(string()),
   stackscript_id: number().notRequired(),
   stackscript_data,
   booted: boolean().notRequired()
+});
+
+export const RebuildLinodeFromStackScriptSchema = RebuildLinodeSchema.shape({
+  stackscript_id: number().required('A StackScript is required.')
 });
 
 export const IPAllocationSchema = object({
@@ -208,12 +238,7 @@ export const CreateLinodeDiskSchema = object({
       .required(
         'You must provide a root password when deploying from an image.'
       )
-      .min(6, 'Password must be between 6 and 128 characters.')
-      .max(128, 'Password must be between 6 and 128 characters.')
-      .matches(
-        /^(((?=.*[a-z])(?=.*[A-Z]))|((?=.*[a-z])(?=.*[0-9]))|((?=.*[A-Z])(?=.*[0-9]))|((?=.*[a-z])(?=.*[!"#$%&'()*+,-.\/:;<=>?@\[\]^_`{|}~\\]))|((?=.*[A-Z])(?=.*[!"#$%&'()*+,-.\/:;<=>?@\[\]^_`{|}~\\]))|((?=.*[0-9])(?=.*[!"#$%&'()*+,-.\/:;<=>?@\[\]^_`{|}~\\])))/,
-        'Password must contain at least 2 of the following classes: uppercase letters, lowercase letters, numbers, and punctuation.'
-      ),
+      .concat(rootPasswordValidation),
     // .test('is-strong-password', 'Please choose a stronger password.', (value: string) => return zxcvbn(value).score > 3),
     otherwise: string().notRequired()
   }),

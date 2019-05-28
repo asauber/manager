@@ -15,23 +15,19 @@ import DefaultLoader from 'src/components/DefaultLoader';
 import SnackBar from 'src/components/SnackBar';
 import { GA_ID, GTM_ID, isProduction } from 'src/constants';
 import 'src/exceptionReporting';
+import LoginAsCustomerCallback from 'src/layouts/LoginAsCustomerCallback';
 import Logout from 'src/layouts/Logout';
 import OAuthCallbackPage from 'src/layouts/OAuth';
 import store from 'src/store';
-import { sendEvent } from 'src/utilities/analytics';
 import 'src/utilities/createImageBitmap';
+import { sendCurrentThemeSettingsEvent } from 'src/utilities/ga';
 import 'src/utilities/request';
 import isPathOneOf from 'src/utilities/routing/isPathOneOf';
-import { theme } from 'src/utilities/storage';
+import { spacing as spacingChoice, theme } from 'src/utilities/storage';
 import App from './App';
 import './events';
 import './index.css';
 import LinodeThemeWrapper from './LinodeThemeWrapper';
-import {
-  initialize as sessionInitialize,
-  refreshOAuthOnUserInteraction,
-  refreshOAuthToken
-} from './session';
 
 const Lish = DefaultLoader({
   loader: () => import('src/features/Lish')
@@ -43,19 +39,11 @@ const Lish = DefaultLoader({
 initAnalytics(GA_ID, isProduction);
 initTagManager(GTM_ID);
 
-if (theme.get() === 'dark') {
-  sendEvent({
-    category: 'Theme Choice',
-    action: 'Dark Theme',
-    label: location.pathname
-  });
-} else {
-  sendEvent({
-    category: 'Theme Choice',
-    action: 'Light Theme',
-    label: location.pathname
-  });
-}
+const themeChoice = theme.get() === 'dark' ? 'Dark Theme' : 'Light Theme';
+const spacingMode =
+  spacingChoice.get() === 'compact' ? 'Compact Mode' : 'Normal Mode';
+
+sendCurrentThemeSettingsEvent(`${themeChoice} | ${spacingMode}`);
 
 /**
  * Send pageviews unless blacklisted.
@@ -66,12 +54,6 @@ createBrowserHistory().listen(({ pathname }) => {
     (window as any).ga('send', 'pageview');
   }
 });
-
-sessionInitialize();
-if (!isPathOneOf(['/oauth', '/null', '/login'], window.location.pathname)) {
-  refreshOAuthToken();
-}
-refreshOAuthOnUserInteraction();
 
 const renderNullAuth = () => <span>null auth route</span>;
 
@@ -102,16 +84,19 @@ const renderApp = (props: RouteProps) => (
 );
 
 const renderAuthentication = () => (
-  <AuthenticationWrapper>
-    <Switch>
-      <Route path="/linodes/:linodeId/lish" render={renderLish} />
-      <Route exact path="/oauth/callback" component={OAuthCallbackPage} />
-      {/* A place to go that prevents the app from loading while refreshing OAuth tokens */}
-      <Route exact path="/nullauth" render={renderNullAuth} />
-      <Route exact path="/logout" component={Logout} />
-      <Route render={renderApp} />
-    </Switch>
-  </AuthenticationWrapper>
+  <Switch>
+    <Route exact path="/oauth/callback" component={OAuthCallbackPage} />
+    <Route exact path="/admin/callback" component={LoginAsCustomerCallback} />
+    {/* A place to go that prevents the app from loading while refreshing OAuth tokens */}
+    <Route exact path="/nullauth" render={renderNullAuth} />
+    <Route exact path="/logout" component={Logout} />
+    <AuthenticationWrapper>
+      <Switch>
+        <Route path="/linodes/:linodeId/lish" render={renderLish} />
+        <Route render={renderApp} />
+      </Switch>
+    </AuthenticationWrapper>
+  </Switch>
 );
 
 ReactDOM.render(

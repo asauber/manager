@@ -23,7 +23,7 @@ describe('events.reducer', () => {
             action: 'linode_reboot',
             read: false,
             percent_complete: 100,
-            username: 'coolguymarty',
+            username: 'test',
             rate: null,
             entity: {
               id: 11241778,
@@ -41,7 +41,7 @@ describe('events.reducer', () => {
             action: 'linode_shutdown',
             read: false,
             percent_complete: 80,
-            username: 'coolguymarty',
+            username: 'test',
             rate: null,
             entity: {
               id: 11642886,
@@ -71,16 +71,9 @@ describe('events.reducer', () => {
         });
 
         it('should update the inProgressEvents', () => {
-          expect(state).toHaveProperty('inProgressEvents', { 18022171: true });
+          expect(state).toHaveProperty('inProgressEvents', { 18022171: 80 });
         });
       });
     });
-
-    describe('UPDATE_EVENTS_AS_SEEN', () => {});
-  });
-
-  describe('async', () => {
-    describe('getEvents', () => {});
-    describe('markAllSeen', () => {});
   });
 });

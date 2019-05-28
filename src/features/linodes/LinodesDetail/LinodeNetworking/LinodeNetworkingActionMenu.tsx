@@ -9,11 +9,14 @@ interface Props {
   onRemove?: (ip: Linode.IPAddress) => void;
   ipType: IPTypes;
   ipAddress?: Linode.IPAddress;
+  readOnly?: boolean;
 }
 
 export type IPTypes =
   | 'SLAAC'
   | 'Public'
+  | 'Public Reserved'
+  | 'Private Reserved'
   | 'Private'
   | 'Shared'
   | 'Link Local'
@@ -23,10 +26,17 @@ type CombinedProps = Props & RouteComponentProps<{}>;
 
 class LinodeNetworkingActionMenu extends React.Component<CombinedProps> {
   createActions = () => {
-    const { onView, onEdit, onRemove, ipType, ipAddress } = this.props;
+    const {
+      onView,
+      onEdit,
+      onRemove,
+      ipType,
+      ipAddress,
+      readOnly
+    } = this.props;
 
     return (closeMenu: Function): Action[] => {
-      const actions = [
+      const actions: Action[] = [
         {
           title: 'View',
           onClick: (e: React.MouseEvent<HTMLElement>) => {
@@ -38,14 +48,15 @@ class LinodeNetworkingActionMenu extends React.Component<CombinedProps> {
       ];
 
       /**
-       * can only edit if we're not dealing with
-       * either a private IP or Link Local IP
+       * can only edit if we're not dealing with private IPs, link local, or reserved IPs
        */
       if (
         onEdit &&
         ipAddress &&
         ipType !== 'Private' &&
-        ipType !== 'Link Local'
+        ipType !== 'Link Local' &&
+        ipType !== 'Public Reserved' &&
+        ipType !== 'Private Reserved'
       ) {
         actions.push({
           title: 'Edit RDNS',
@@ -53,7 +64,11 @@ class LinodeNetworkingActionMenu extends React.Component<CombinedProps> {
             onEdit(ipAddress);
             closeMenu();
             e.preventDefault();
-          }
+          },
+          disabled: readOnly,
+          tooltip: readOnly
+            ? "You don't have permissions to modify this Linode"
+            : undefined
         });
       }
 
@@ -64,7 +79,11 @@ class LinodeNetworkingActionMenu extends React.Component<CombinedProps> {
             onRemove(ipAddress);
             closeMenu();
             e.preventDefault();
-          }
+          },
+          disabled: readOnly,
+          tooltip: readOnly
+            ? "You don't have permissions to modify this Linode"
+            : undefined
         });
       }
 

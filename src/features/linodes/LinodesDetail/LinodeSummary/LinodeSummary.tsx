@@ -1,10 +1,8 @@
 import * as moment from 'moment';
-import { compose, map, pathOr } from 'ramda';
+import { map, pathOr } from 'ramda';
 import * as React from 'react';
 import { connect } from 'react-redux';
-import FormControl from 'src/components/core/FormControl';
-import InputLabel from 'src/components/core/InputLabel';
-import MenuItem from 'src/components/core/MenuItem';
+import { compose } from 'recompose';
 import {
   StyleRulesCallback,
   withStyles,
@@ -12,14 +10,15 @@ import {
 } from 'src/components/core/styles';
 import Typography from 'src/components/core/Typography';
 import { DocumentTitleSegment } from 'src/components/DocumentTitle';
+import Select, { Item } from 'src/components/EnhancedSelect/Select';
 import Grid from 'src/components/Grid';
 import LineGraph from 'src/components/LineGraph';
-import Select from 'src/components/Select';
 import { withLinodeDetailContext } from 'src/features/linodes/LinodesDetail/linodeDetailContext';
 import { displayType, typeLabelLong } from 'src/features/linodes/presentation';
 import { getLinodeStats, getLinodeStatsByDate } from 'src/services/linodes';
 import { ApplicationState } from 'src/store';
 import { setUpCharts } from 'src/utilities/charts';
+import { initAll } from 'src/utilities/initAll';
 import { isRecent } from 'src/utilities/isRecent';
 import {
   formatBitsPerSecond,
@@ -29,10 +28,13 @@ import {
   getMetrics,
   getTotalTraffic
 } from 'src/utilities/statMetrics';
+import ActivitySummary from './ActivitySummary';
 import MetricsDisplay from './MetricsDisplay';
 import StatsPanel from './StatsPanel';
 import SummaryPanel from './SummaryPanel';
 import TotalTraffic, { TotalTrafficProps } from './TotalTraffic';
+
+import { ExtendedEvent } from 'src/store/events/event.helpers';
 
 setUpCharts();
 
@@ -41,9 +43,11 @@ type ClassNames =
   | 'sidebar'
   | 'headerWrapper'
   | 'chart'
+  | 'chartSelect'
   | 'leftLegend'
   | 'bottomLegend'
   | 'graphTitle'
+  | 'graphSelectTitle'
   | 'graphControls'
   | 'totalTraffic';
 
@@ -76,8 +80,8 @@ const styles: StyleRulesCallback<ClassNames> = theme => {
     },
     leftLegend: {
       position: 'absolute',
-      left: -8,
-      bottom: '50%',
+      left: -18,
+      bottom: 48,
       transform: 'rotate(-90deg)',
       color: '#777',
       fontSize: 14
@@ -100,12 +104,23 @@ const styles: StyleRulesCallback<ClassNames> = theme => {
     graphTitle: {
       marginRight: theme.spacing.unit * 2
     },
+    graphSelectTitle: {
+      marginRight: theme.spacing.unit,
+      position: 'relative',
+      color: theme.color.headline,
+      top: -1
+    },
     graphControls: {
       display: 'flex',
-      alignItems: 'center'
+      alignItems: 'center',
+      marginTop: theme.spacing.unit * 2,
+      marginBottom: theme.spacing.unit * 2
     },
     totalTraffic: {
       margin: '12px'
+    },
+    chartSelect: {
+      maxWidth: 150
     }
   };
 };
@@ -117,7 +132,7 @@ interface LinodeContextProps {
 }
 
 interface State {
-  stats: Linode.TodoAny;
+  stats?: Linode.Stats;
   rangeSelection: string;
   statsLoadError?: string;
   dataIsLoading: boolean;
@@ -143,7 +158,7 @@ export class LinodeSummary extends React.Component<CombinedProps, State> {
     dataIsLoading: false
   };
 
-  rangeSelectOptions: (typeof MenuItem)[] = [];
+  rangeSelectOptions: Item[] = [];
 
   constructor(props: CombinedProps) {
     super(props);
@@ -200,11 +215,7 @@ export class LinodeSummary extends React.Component<CombinedProps, State> {
           : `${testYear}-${testMonth}-01`;
     } while (moment(formattedTestDate).diff(creationFirstOfMonth) >= 0);
     (this.rangeSelectOptions as Linode.TodoAny) = options.map(option => {
-      return (
-        <MenuItem key={option[0]} value={option[0]}>
-          {option[1]}
-        </MenuItem>
-      );
+      return { label: option[1], value: option[0] };
     });
   }
 
@@ -222,7 +233,19 @@ export class LinodeSummary extends React.Component<CombinedProps, State> {
   }
 
   getStats = () => {
-    const { linodeId } = this.props;
+    const { linodeId, linodeCreated } = this.props;
+
+    // Stats will not be available for a Linode for at least 5 minutes after
+    // it's been created, so no need to do an expensive `/stats` request until
+    // 5 minutes have passed.
+    const fiveMinutesAgo = moment().subtract(5, 'minutes');
+    if (moment.utc(linodeCreated).isAfter(fiveMinutesAgo)) {
+      return this.setState({
+        dataIsLoading: false,
+        isTooEarlyForGraphData: true
+      });
+    }
+
     const { rangeSelection } = this.state;
     if (!linodeId) {
       return;
@@ -242,14 +265,17 @@ export class LinodeSummary extends React.Component<CombinedProps, State> {
         }
 
         this.setState({ statsLoadError: undefined });
-        this.setState({ stats: response.data, dataIsLoading: false });
+        this.setState({
+          // Occasionally the last reading of each stats reading is incorrect, so we drop
+          // the last element of each array in the stats response.
+          stats: initAll(response),
+          dataIsLoading: false
+        });
       })
       .catch(errorResponse => {
         if (!this.mounted) {
           return;
         }
-
-        const { linodeCreated } = this.props;
 
         // If a Linode has just been created, we'll get an error from the API when
         // requesting stats (since there's no data available yet.) In this case,
@@ -266,12 +292,16 @@ export class LinodeSummary extends React.Component<CombinedProps, State> {
           ['reason'],
           errorResponse[0]
         );
-        this.setState({ dataIsLoading: false, statsError: errorText });
+
+        /** only show an error if stats aren't already loaded */
+        return !this.state.stats
+          ? this.setState({ dataIsLoading: false, statsError: errorText })
+          : this.setState({ dataIsLoading: false });
       });
   };
 
-  handleChartRangeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const value = e.target.value;
+  handleChartRangeChange = (e: Item<string>) => {
+    const value = e.value;
     this.setState({ rangeSelection: value }, () => {
       this.getStats();
     });
@@ -279,7 +309,7 @@ export class LinodeSummary extends React.Component<CombinedProps, State> {
 
   renderCPUChart = () => {
     const { rangeSelection, stats } = this.state;
-    const { classes } = this.props;
+    const { classes, timezone } = this.props;
     const data = pathOr([], ['data', 'cpu'], stats);
 
     const metrics = getMetrics(data);
@@ -290,6 +320,7 @@ export class LinodeSummary extends React.Component<CombinedProps, State> {
         <div className={classes.chart}>
           <div className={classes.leftLegend}>CPU %</div>
           <LineGraph
+            timezone={timezone}
             chartHeight={chartHeight}
             showToday={rangeSelection === '24'}
             data={[
@@ -322,7 +353,7 @@ export class LinodeSummary extends React.Component<CombinedProps, State> {
   };
 
   renderIPv4TrafficChart = () => {
-    const { classes } = this.props;
+    const { classes, timezone } = this.props;
     const { rangeSelection, stats } = this.state;
 
     const v4Data = {
@@ -365,6 +396,7 @@ export class LinodeSummary extends React.Component<CombinedProps, State> {
         <div className={classes.chart}>
           <div className={classes.leftLegend}>bits/sec</div>
           <LineGraph
+            timezone={timezone}
             chartHeight={chartHeight}
             showToday={rangeSelection === '24'}
             data={[
@@ -445,7 +477,7 @@ export class LinodeSummary extends React.Component<CombinedProps, State> {
   };
 
   renderIPv6TrafficChart = () => {
-    const { classes } = this.props;
+    const { classes, timezone } = this.props;
     const { rangeSelection, stats } = this.state;
 
     const data = {
@@ -474,6 +506,7 @@ export class LinodeSummary extends React.Component<CombinedProps, State> {
         <div className={classes.chart}>
           <div className={classes.leftLegend}>bits/sec</div>
           <LineGraph
+            timezone={timezone}
             chartHeight={chartHeight}
             showToday={rangeSelection === '24'}
             data={[
@@ -554,7 +587,7 @@ export class LinodeSummary extends React.Component<CombinedProps, State> {
   };
 
   renderDiskIOChart = () => {
-    const { classes } = this.props;
+    const { classes, timezone } = this.props;
     const { rangeSelection, stats } = this.state;
 
     const data = {
@@ -567,10 +600,11 @@ export class LinodeSummary extends React.Component<CombinedProps, State> {
     return (
       <React.Fragment>
         <div className={classes.chart}>
-          <div className={classes.leftLegend} style={{ left: -18, bottom: 48 }}>
+          <div className={classes.leftLegend} style={{ left: -24 }}>
             blocks/sec
           </div>
           <LineGraph
+            timezone={timezone}
             chartHeight={chartHeight}
             showToday={rangeSelection === '24'}
             data={[
@@ -622,12 +656,7 @@ export class LinodeSummary extends React.Component<CombinedProps, State> {
   render() {
     const { linodeData: linode, classes, typesData } = this.props;
 
-    const {
-      dataIsLoading,
-      statsError,
-      rangeSelection,
-      isTooEarlyForGraphData
-    } = this.state;
+    const { dataIsLoading, statsError, isTooEarlyForGraphData } = this.state;
 
     // Shared props for all stats charts
     const chartProps = {
@@ -660,42 +689,42 @@ export class LinodeSummary extends React.Component<CombinedProps, State> {
             <Grid
               container
               justify="space-between"
-              alignItems="center"
+              alignItems="flex-start"
               className={classes.headerWrapper}
+              direction="column"
             >
               <Grid item className="py0">
-                <Typography
-                  role="header"
-                  variant="h2"
-                  className={classes.graphTitle}
-                >
+                <Typography variant="h2" className={classes.graphTitle}>
                   {longLabel}
                 </Typography>
               </Grid>
-              <Grid item className="py0">
-                <div className={classes.graphControls}>
-                  <Typography
-                    role="header"
-                    variant="h3"
-                    className={classes.graphTitle}
-                  >
-                    Graphs
-                  </Typography>
-                  <FormControl style={{ marginTop: 0 }}>
-                    <InputLabel htmlFor="chartRange" disableAnimation hidden>
-                      Select Time Range
-                    </InputLabel>
-                    <Select
-                      value={rangeSelection}
-                      onChange={this.handleChartRangeChange}
-                      inputProps={{ name: 'chartRange', id: 'chartRange' }}
-                      small
-                    >
-                      {this.rangeSelectOptions}
-                    </Select>
-                  </FormControl>
-                </div>
-              </Grid>
+            </Grid>
+
+            <Grid item>
+              <ActivitySummary
+                eventsFromRedux={this.props.events}
+                linodeId={linode.id}
+                inProgressEvents={this.props.inProgressEvents}
+                mostRecentEventTime={this.props.mostRecentEventTime}
+              />
+            </Grid>
+
+            <Grid item className="py0">
+              <div className={classes.graphControls}>
+                <Select
+                  options={this.rangeSelectOptions}
+                  defaultValue={this.rangeSelectOptions[0]}
+                  onChange={this.handleChartRangeChange}
+                  name="chartRange"
+                  id="chartRange"
+                  small
+                  label="Select Time Range"
+                  hideLabel
+                  className={classes.chartSelect}
+                  isClearable={false}
+                  data-qa-item="chartRange"
+                />
+              </div>
             </Grid>
 
             <StatsPanel
@@ -738,13 +767,25 @@ const linodeContext = withLinodeDetailContext(({ linode }) => ({
 
 interface WithTypesProps {
   typesData: Linode.LinodeType[];
+  timezone: string;
+  inProgressEvents: Record<number, number>;
+  events: ExtendedEvent[];
+  mostRecentEventTime: string;
 }
 
 const withTypes = connect((state: ApplicationState, ownProps) => ({
-  typesData: state.__resources.types.entities
+  typesData: state.__resources.types.entities,
+  timezone: pathOr(
+    'UTC',
+    ['__resources', 'profile', 'data', 'timezone'],
+    state
+  ),
+  inProgressEvents: state.events.inProgressEvents,
+  events: state.events.events,
+  mostRecentEventTime: state.events.mostRecentEventTime
 }));
 
-const enhanced = compose(
+const enhanced = compose<CombinedProps, {}>(
   styled,
   withTypes,
   linodeContext

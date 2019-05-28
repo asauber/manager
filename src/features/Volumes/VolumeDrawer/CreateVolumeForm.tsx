@@ -21,6 +21,7 @@ import {
 import { CreateVolumeSchema } from 'src/services/volumes/volumes.schema.ts';
 import { MapState } from 'src/store/types';
 import { getErrorStringOrDefault } from 'src/utilities/errorUtils';
+import { sendCreateVolumeEvent } from 'src/utilities/ga';
 import ConfigSelect from './ConfigSelect';
 import LabelField from './LabelField';
 import LinodeSelect from './LinodeSelect';
@@ -93,6 +94,8 @@ const CreateVolumeForm: React.StatelessComponent<CombinedProps> = props => {
               filesystem_path,
               `Volume scheduled for creation.`
             );
+            // GA Event
+            sendCreateVolumeEvent(`${label}: ${size}GiB`);
           })
           .catch(errorResponse => {
             const defaultMessage = `Unable to create a volume at this time. Please try again later.`;
@@ -186,7 +189,7 @@ const CreateVolumeForm: React.StatelessComponent<CombinedProps> = props => {
               error={touched.region ? errors.region : undefined}
               name="region"
               onBlur={handleBlur}
-              onChange={handleChange}
+              onChange={value => setFieldValue('region', value)}
               value={values.region}
               shouldOnlyDisplayRegionsWithBlockStorage={true}
               disabled={disabled}

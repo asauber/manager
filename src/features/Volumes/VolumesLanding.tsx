@@ -1,4 +1,4 @@
-import { InjectedNotistackProps, withSnackbar } from 'notistack';
+import { withSnackbar, WithSnackbarProps } from 'notistack';
 import * as React from 'react';
 import { connect, Dispatch } from 'react-redux';
 import { RouteComponentProps } from 'react-router-dom';
@@ -6,7 +6,6 @@ import { compose } from 'recompose';
 import { bindActionCreators } from 'redux';
 import VolumesIcon from 'src/assets/addnewmenu/volume.svg';
 import AddNewLink from 'src/components/AddNewLink';
-import CircleProgress from 'src/components/CircleProgress';
 import FormControlLabel from 'src/components/core/FormControlLabel';
 import {
   StyleRulesCallback,
@@ -20,8 +19,8 @@ import Grid from 'src/components/Grid';
 import OrderBy from 'src/components/OrderBy';
 import { PaginationProps } from 'src/components/Pagey';
 import Placeholder from 'src/components/Placeholder';
-import TableRowError from 'src/components/TableRowError';
 import Toggle from 'src/components/Toggle';
+import { regionsWithoutBlockStorage } from 'src/constants';
 import _withEvents, { EventsProps } from 'src/containers/events.container';
 import localStorageContainer from 'src/containers/localStorage.container';
 import withVolumes, {
@@ -33,6 +32,7 @@ import withVolumesRequests, {
 import withLinodes from 'src/containers/withLinodes.container';
 import { BlockStorage } from 'src/documentation';
 import { resetEventsPolling } from 'src/events';
+import LinodePermissionsError from 'src/features/linodes/LinodesDetail/LinodePermissionsError';
 import {
   openForClone,
   openForConfig,
@@ -40,11 +40,13 @@ import {
   openForEdit,
   openForResize
 } from 'src/store/volumeDrawer';
-import { sendEvent } from 'src/utilities/analytics';
+import { sendGroupByTagEnabledEvent } from 'src/utilities/ga';
 import DestructiveVolumeDialog from './DestructiveVolumeDialog';
 import ListGroupedVolumes from './ListGroupedVolumes';
 import ListVolumes from './ListVolumes';
 import VolumeAttachmentDrawer from './VolumeAttachmentDrawer';
+
+import ErrorState from 'src/components/ErrorState';
 
 type ClassNames =
   | 'root'
@@ -125,8 +127,8 @@ interface WithLinodesProps {
   linodesError?: Linode.ApiFieldError[];
 }
 export interface ExtendedVolume extends Linode.Volume {
-  linodeLabel: string;
-  linodeStatus: string;
+  linodeLabel?: string;
+  linodeStatus?: string;
 }
 
 interface Props {
@@ -135,6 +137,7 @@ interface Props {
   linodeRegion?: string;
   linodeConfigs?: Linode.Config[];
   recentEvent?: Linode.Event;
+  readOnly?: boolean;
 }
 
 //
@@ -177,7 +180,9 @@ interface State {
   destructiveDialog: {
     open: boolean;
     mode: 'detach' | 'delete';
+    volumeLabel: string;
     volumeId?: number;
+    linodeLabel: string;
   };
 }
 
@@ -192,7 +197,7 @@ type CombinedProps = Props &
   PaginationProps<ExtendedVolume> &
   DispatchProps &
   RouteProps &
-  InjectedNotistackProps &
+  WithSnackbarProps &
   WithMappedVolumesProps &
   WithStyles<ClassNames>;
 
@@ -205,7 +210,9 @@ class VolumesLanding extends React.Component<CombinedProps, State> {
     },
     destructiveDialog: {
       open: false,
-      mode: 'detach'
+      mode: 'detach',
+      volumeLabel: '',
+      linodeLabel: ''
     }
   };
 
@@ -243,22 +250,30 @@ class VolumesLanding extends React.Component<CombinedProps, State> {
     });
   };
 
-  handleDetach = (volumeId: number) => {
+  handleDetach = (
+    volumeId: number,
+    volumeLabel: string,
+    linodeLabel: string
+  ) => {
     this.setState({
       destructiveDialog: {
         open: true,
         mode: 'detach',
-        volumeId
+        volumeId,
+        volumeLabel,
+        linodeLabel
       }
     });
   };
 
-  handleDelete = (volumeId: number) => {
+  handleDelete = (volumeId: number, volumeLabel: string) => {
     this.setState({
       destructiveDialog: {
         open: true,
         mode: 'delete',
-        volumeId
+        volumeId,
+        volumeLabel,
+        linodeLabel: ''
       }
     });
   };
@@ -266,17 +281,13 @@ class VolumesLanding extends React.Component<CombinedProps, State> {
   render() {
     const {
       classes,
-      volumesLoading,
       volumesError,
-      mappedVolumesDataWithLinodes
+      mappedVolumesDataWithLinodes,
+      readOnly
     } = this.props;
 
-    if (volumesError) {
+    if (volumesError && volumesError.read) {
       return <RenderError />;
-    }
-
-    if (volumesLoading) {
-      return <RenderLoading />;
     }
 
     // If this is the Volumes tab on a Linode, we want ONLY the Volumes attached to this Linode.
@@ -294,6 +305,7 @@ class VolumesLanding extends React.Component<CombinedProps, State> {
     return (
       <React.Fragment>
         <DocumentTitleSegment segment="Volumes" />
+        {readOnly && <LinodePermissionsError />}
         <Grid
           container
           justify="space-between"
@@ -301,12 +313,7 @@ class VolumesLanding extends React.Component<CombinedProps, State> {
           style={{ paddingBottom: 0 }}
         >
           <Grid item className={classes.titleWrapper}>
-            <Typography
-              role="header"
-              variant="h1"
-              className={classes.title}
-              data-qa-title
-            >
+            <Typography variant="h1" className={classes.title} data-qa-title>
               Volumes
             </Typography>
           </Grid>
@@ -330,7 +337,7 @@ class VolumesLanding extends React.Component<CombinedProps, State> {
               <Grid item className="pt0">
                 <AddNewLink
                   onClick={this.openCreateVolumeDrawer}
-                  label="Create a Volume"
+                  label="Add a Volume"
                 />
               </Grid>
             </Grid>
@@ -348,6 +355,8 @@ class VolumesLanding extends React.Component<CombinedProps, State> {
         />
         <DestructiveVolumeDialog
           open={this.state.destructiveDialog.open}
+          volumeLabel={this.state.destructiveDialog.volumeLabel}
+          linodeLabel={this.state.destructiveDialog.linodeLabel}
           mode={this.state.destructiveDialog.mode}
           onClose={this.closeDestructiveDialog}
           onDetach={this.detachVolume}
@@ -363,7 +372,20 @@ class VolumesLanding extends React.Component<CombinedProps, State> {
   };
 
   renderEmpty = () => {
-    const { linodeConfigs } = this.props;
+    const { linodeConfigs, linodeRegion, readOnly } = this.props;
+
+    if (regionsWithoutBlockStorage.some(region => region === linodeRegion)) {
+      return (
+        <React.Fragment>
+          <DocumentTitleSegment segment="Volumes" />
+          <Placeholder
+            title="Volumes are not available in this region"
+            copy=""
+            icon={VolumesIcon}
+          />
+        </React.Fragment>
+      );
+    }
 
     if (linodeConfigs && linodeConfigs.length === 0) {
       return (
@@ -385,13 +407,15 @@ class VolumesLanding extends React.Component<CombinedProps, State> {
     return (
       <React.Fragment>
         <DocumentTitleSegment segment="Volumes" />
+        {readOnly && <LinodePermissionsError />}
         <Placeholder
-          title="Create a Volume"
-          copy="Add storage to your Linodes using the resilient Volumes service for $0.10/GiB per month."
+          title="Add Block Storage!"
+          copy={<EmptyCopy />}
           icon={VolumesIcon}
           buttonProps={{
             onClick: this.openCreateVolumeDrawer,
-            children: 'Create a Volume'
+            children: 'Add a Volume',
+            disabled: readOnly
           }}
         />
       </React.Fragment>
@@ -503,6 +527,25 @@ class VolumesLanding extends React.Component<CombinedProps, State> {
   };
 }
 
+const EmptyCopy = () => (
+  <>
+    <Typography variant="subtitle1">Need additional storage?</Typography>
+    <Typography variant="subtitle1">
+      <a
+        href="https://linode.com/docs/platform/block-storage/how-to-use-block-storage-with-your-linode-new-manager/"
+        target="_blank"
+        className="h-u"
+      >
+        Here's how to use Block Storage with your Linode
+      </a>
+      &nbsp;or&nbsp;
+      <a href="https://www.linode.com/docs/" target="_blank" className="h-u">
+        visit our guides and tutorials.
+      </a>
+    </Typography>
+  </>
+);
+
 const mapDispatchToProps = (dispatch: Dispatch<any>) =>
   bindActionCreators(
     {
@@ -547,11 +590,7 @@ const withLocalStorage = localStorageContainer<
     toggleGroupByTag: state => (checked: boolean) => {
       storage.groupVolumesByTag.set(checked ? 'true' : 'false');
 
-      sendEvent({
-        category: VolumesLanding.eventCategory,
-        action: 'group by tag',
-        label: String(checked)
-      });
+      sendGroupByTagEnabledEvent(VolumesLanding.eventCategory, checked);
 
       return {
         ...state,
@@ -618,34 +657,33 @@ export default compose<CombinedProps, Props>(
       linodesError
     })
   ),
-  withVolumes((ownProps: CombinedProps, volumesData, volumesLoading) => {
-    const mappedData = volumesData.items.map(id => volumesData.itemsById[id]);
-    const mappedVolumesDataWithLinodes = mappedData.map(volume => {
-      const volumeWithLinodeData = addAttachedLinodeInfoToVolume(
-        volume,
-        ownProps.linodesData
-      );
-      return addRecentEventToVolume(volumeWithLinodeData, ownProps.eventsData);
-    });
-    return {
-      ...ownProps,
-      volumesData,
-      mappedVolumesDataWithLinodes,
-      volumesLoading
-    };
-  }),
+  withVolumes(
+    (ownProps: CombinedProps, volumesData, volumesLoading, volumesError) => {
+      const mappedData = volumesData.items.map(id => volumesData.itemsById[id]);
+      const mappedVolumesDataWithLinodes = mappedData.map(volume => {
+        const volumeWithLinodeData = addAttachedLinodeInfoToVolume(
+          volume,
+          ownProps.linodesData
+        );
+        return addRecentEventToVolume(
+          volumeWithLinodeData,
+          ownProps.eventsData
+        );
+      });
+      return {
+        ...ownProps,
+        volumesData,
+        mappedVolumesDataWithLinodes,
+        volumesLoading,
+        volumesError
+      };
+    }
+  ),
   withSnackbar
 )(VolumesLanding);
 
-const RenderLoading = () => {
-  return <CircleProgress />;
-};
-
 const RenderError = () => {
   return (
-    <TableRowError
-      colSpan={7}
-      message="There was an error loading your volumes. Please try again later"
-    />
+    <ErrorState errorText="There was an error loading your Volumes. Please try again later" />
   );
 };

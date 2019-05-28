@@ -8,6 +8,7 @@ namespace Linode {
   }
 
   export interface Account {
+    active_since: string;
     address_2: string;
     email: string;
     first_name: string;
@@ -19,6 +20,7 @@ namespace Linode {
     country: string;
     last_name: string;
     balance: number;
+    balance_uninvoiced: number;
     city: string;
     phone: string;
     company: string;
@@ -40,7 +42,9 @@ namespace Linode {
     id: number;
     date: string;
     label: string;
-    total: string | number;
+    total: number;
+    tax: number;
+    subtotal: number;
   }
 
   export interface InvoiceItem {
@@ -51,12 +55,14 @@ namespace Linode {
     quantity: null | number;
     type: 'hourly' | 'prepay' | 'misc';
     unit_price: null | number;
+    tax: number;
+    total: number;
   }
 
   export interface Payment {
     id: number;
     date: string;
-    usd: string | number;
+    usd: number;
   }
 
   export type GrantLevel = null | 'read_only' | 'read_write';

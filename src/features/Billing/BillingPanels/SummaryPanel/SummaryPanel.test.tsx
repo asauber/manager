@@ -18,7 +18,9 @@ describe('SummaryPanel', () => {
     credit_card: { expiry: '02/2012', last_four: '1234' },
     tax_id: '',
     country: '',
-    balance: 0
+    balance: 0,
+    balance_uninvoiced: 0,
+    active_since: 'hello world'
   };
 
   const mockClasses: any = {
@@ -43,6 +45,7 @@ describe('SummaryPanel', () => {
       }}
       accountLoading={false}
       balance={0}
+      balance_uninvoiced={0}
     />
   );
 
@@ -57,6 +60,7 @@ describe('SummaryPanel', () => {
       }}
       accountLoading={false}
       balance={0}
+      balance_uninvoiced={0}
     />
   );
 

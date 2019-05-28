@@ -21,7 +21,7 @@ import {
   transitionText
 } from 'src/features/linodes/transitions';
 import { lishLaunch } from 'src/features/Lish';
-import { sendEvent } from 'src/utilities/analytics';
+import { sendLinodeActionMenuItemEvent } from 'src/utilities/ga';
 import { typeLabelDetails } from '../presentation';
 import hasMutationAvailable, {
   HasMutationAvailable
@@ -71,19 +71,13 @@ export type CombinedProps = Props &
 
 export class LinodeCard extends React.PureComponent<CombinedProps> {
   handleConsoleButtonClick = () => {
-    sendEvent({
-      category: 'Linode Action Menu Item',
-      action: 'Launch Console'
-    });
+    sendLinodeActionMenuItemEvent('Launch Console');
     const { id } = this.props;
     lishLaunch(id);
   };
 
   handleRebootButtonClick = () => {
-    sendEvent({
-      category: 'Linode Action Menu Item',
-      action: 'Reboot Linode'
-    });
+    sendLinodeActionMenuItemEvent('Reboot Linode');
     const { id, label, toggleConfirmation } = this.props;
     toggleConfirmation('reboot', id, label);
   };
@@ -172,8 +166,8 @@ export class LinodeCard extends React.PureComponent<CombinedProps> {
               <RegionIndicator region={region} />
             </div>
             <div className={classes.cardSection} data-qa-ips>
-              <IPAddress ips={ipv4} copyRight showMore />
-              <IPAddress ips={[ipv6]} copyRight showMore />
+              <IPAddress ips={ipv4} copyRight showAll />
+              <IPAddress ips={[ipv6]} copyRight showAll />
             </div>
             <div className={classes.cardSection} data-qa-image>
               {imageLabel}
@@ -284,12 +278,7 @@ export const RenderTitle: React.StatelessComponent<{
           />
         </Grid>
         <Grid item className={classes.cardHeader + ' py0'}>
-          <Typography
-            role="header"
-            className={classes.wrapHeader}
-            variant="h3"
-            data-qa-label
-          >
+          <Typography className={classes.wrapHeader} variant="h3" data-qa-label>
             {linodeLabel}
           </Typography>
         </Grid>

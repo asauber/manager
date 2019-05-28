@@ -10,7 +10,7 @@ import Typography from 'src/components/core/Typography';
 import Grid from 'src/components/Grid';
 
 interface Props {
-  errorText: string;
+  errorText: string | JSX.Element;
   compact?: boolean;
   cozy?: boolean;
 }
@@ -56,7 +56,6 @@ const ErrorState = (props: Props & WithStyles<CSSClasses>) => {
         </div>
         <Typography
           style={{ textAlign: 'center' }}
-          role="header"
           variant="h3"
           data-qa-error-msg
         >

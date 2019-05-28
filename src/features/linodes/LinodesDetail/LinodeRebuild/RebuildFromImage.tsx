@@ -1,4 +1,6 @@
-import { InjectedNotistackProps, withSnackbar } from 'notistack';
+import { Formik, FormikProps } from 'formik';
+import { withSnackbar, WithSnackbarProps } from 'notistack';
+import { isEmpty } from 'ramda';
 import * as React from 'react';
 import { RouteComponentProps, withRouter } from 'react-router';
 import { compose } from 'recompose';
@@ -17,8 +19,13 @@ import { resetEventsPolling } from 'src/events';
 import userSSHKeyHoc, {
   UserSSHKeyProps
 } from 'src/features/linodes/userSSHKeyHoc';
+// @todo: Extract these utils out of Volumes
+import {
+  handleFieldErrors,
+  handleGeneralErrors
+} from 'src/features/Volumes/VolumeDrawer/utils';
 import { rebuildLinode, RebuildRequest } from 'src/services/linodes';
-import { getAPIErrorOrDefault, getErrorMap } from 'src/utilities/errorUtils';
+import { RebuildLinodeSchema } from 'src/services/linodes/linode.schema';
 import scrollErrorIntoView from 'src/utilities/scrollErrorIntoView';
 import { withLinodeDetailContext } from '../linodeDetailContext';
 import { RebuildDialog } from './RebuildDialog';
@@ -43,6 +50,7 @@ interface WithImagesProps {
 
 interface ContextProps {
   linodeId: number;
+  permissions: Linode.GrantLevel;
 }
 
 export type CombinedProps = WithImagesProps &
@@ -50,7 +58,17 @@ export type CombinedProps = WithImagesProps &
   ContextProps &
   UserSSHKeyProps &
   RouteComponentProps &
-  InjectedNotistackProps;
+  WithSnackbarProps;
+
+interface RebuildFromImageForm {
+  image: string;
+  root_pass: string;
+}
+
+const initialValues: RebuildFromImageForm = {
+  image: '',
+  root_pass: ''
+};
 
 export const RebuildFromImage: React.StatelessComponent<
   CombinedProps
@@ -62,37 +80,37 @@ export const RebuildFromImage: React.StatelessComponent<
     userSSHKeys,
     linodeId,
     enqueueSnackbar,
-    history
+    history,
+    permissions
   } = props;
 
-  const [selectedImage, setSelectedImage] = React.useState<string>('');
-  const [password, setPassword] = React.useState<string>('');
-  const [errors, setErrors] = React.useState<Linode.ApiFieldError[]>([]);
+  const disabled = permissions === 'read_only';
 
   const [isDialogOpen, setIsDialogOpen] = React.useState<boolean>(false);
-  const [isLoading, setIsLoading] = React.useState<boolean>(false);
 
-  const handleSubmit = () => {
-    // @todo: Ideally we would do form validation BEFORE opening up the
-    // confirmation dialog.
-    setIsLoading(true);
+  const handleFormSubmit = (
+    { image, root_pass }: RebuildFromImageForm,
+    { setSubmitting, setStatus, setErrors }: FormikProps<RebuildFromImageForm>
+  ) => {
+    setSubmitting(true);
+
+    // `status` holds general error messages
+    setStatus(undefined);
 
     const params: RebuildRequest = {
-      image: selectedImage,
-      root_pass: password!,
+      image,
+      root_pass,
       authorized_users: userSSHKeys.filter(u => u.selected).map(u => u.username)
     };
 
     // @todo: eventually this should be a dispatched action instead of a services library call
     rebuildLinode(linodeId, params)
       .then(_ => {
+        // Reset events polling since an in-progress event (rebuild) is happening.
         resetEventsPolling();
 
-        setIsLoading(false);
+        setSubmitting(false);
         setIsDialogOpen(false);
-        setSelectedImage('');
-        setPassword('');
-        setErrors([]);
 
         enqueueSnackbar('Linode rebuild started', {
           variant: 'info'
@@ -100,23 +118,20 @@ export const RebuildFromImage: React.StatelessComponent<
         history.push(`/linodes/${linodeId}/summary`);
       })
       .catch(errorResponse => {
-        setIsLoading(false);
-        setIsDialogOpen(false);
+        const defaultMessage = `There was an issue rebuilding your Linode.`;
+        const mapErrorToStatus = (generalError: string) =>
+          setStatus({ generalError });
 
-        setErrors(
-          getAPIErrorOrDefault(
-            errorResponse,
-            'There was an issue rebuilding your Linode.'
-          )
-        );
+        setSubmitting(false);
+        handleFieldErrors(setErrors, errorResponse);
+        handleGeneralErrors(mapErrorToStatus, errorResponse, defaultMessage);
+        setIsDialogOpen(false);
         scrollErrorIntoView();
       });
   };
 
-  const hasErrorFor = getErrorMap(['image', 'root_pass', 'none'], errors);
-  const generalError = hasErrorFor.none;
-
   return (
+<<<<<<< HEAD
     <Grid item className={classes.root}>
       {generalError && (
         <Notice
@@ -159,13 +174,101 @@ export const RebuildFromImage: React.StatelessComponent<
         handleSubmit={handleSubmit}
       />
     </Grid>
+=======
+    <Formik
+      initialValues={initialValues}
+      validationSchema={RebuildLinodeSchema}
+      validateOnChange={false}
+      onSubmit={handleFormSubmit}
+      render={formikProps => {
+        const {
+          errors,
+          handleSubmit,
+          isSubmitting,
+          setFieldValue,
+          status,
+          values,
+          validateForm
+        } = formikProps;
+
+        // The "Rebuild" button opens a confirmation modal.
+        // We'd like to validate the form before this happens.
+        const handleRebuildButtonClick = () => {
+          validateForm().then(maybeErrors => {
+            // If there aren't any errors, we can open the modal.
+            if (isEmpty(maybeErrors)) {
+              setIsDialogOpen(true);
+              // The form receives the errors automatically, and we scroll them into view.
+            } else {
+              scrollErrorIntoView();
+            }
+          });
+        };
+
+        return (
+          <Grid item className={classes.root}>
+            {/* `status` holds generalError messages */}
+            {status && <Notice error>{status.generalError}</Notice>}
+
+            <SelectImagePanel
+              images={imagesData}
+              error={imagesError || errors.image}
+              updateFor={[classes, values.image, errors]}
+              selectedImageID={values.image}
+              handleSelection={selected => setFieldValue('image', selected)}
+              data-qa-select-image
+              disabled={disabled}
+            />
+            <AccessPanel
+              password={values.root_pass}
+              handleChange={input => setFieldValue('root_pass', input)}
+              updateFor={[
+                classes,
+                values.root_pass,
+                errors,
+                userSSHKeys,
+                values.image
+              ]}
+              error={errors.root_pass}
+              users={userSSHKeys}
+              data-qa-access-panel
+              disabled={disabled}
+              disabledReason={
+                disabled
+                  ? "You don't have permissions to modify this Linode"
+                  : undefined
+              }
+            />
+            <ActionsPanel>
+              <Button
+                type="secondary"
+                className="destructive"
+                onClick={handleRebuildButtonClick}
+                data-testid="rebuild-button"
+                disabled={disabled}
+              >
+                Rebuild
+              </Button>
+            </ActionsPanel>
+            <RebuildDialog
+              isOpen={isDialogOpen}
+              isLoading={isSubmitting}
+              handleClose={() => setIsDialogOpen(false)}
+              handleSubmit={handleSubmit}
+            />
+          </Grid>
+        );
+      }}
+    />
+>>>>>>> aa9dec28f5b8cc095e1da60f974a7dfd064434c6
   );
 };
 
 const styled = withStyles(styles);
 
 const linodeContext = withLinodeDetailContext(({ linode }) => ({
-  linodeId: linode.id
+  linodeId: linode.id,
+  permissions: linode._permissions
 }));
 
 const enhanced = compose<CombinedProps, {}>(

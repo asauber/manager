@@ -1,25 +1,15 @@
+import { pathOr } from 'ramda';
 import { Component } from 'react';
-import { connect, Dispatch } from 'react-redux';
-import { LOGIN_ROOT } from 'src/constants';
-import * as session from 'src/session';
+import { connect, MapDispatchToProps, MapStateToProps } from 'react-redux';
+import { AnyAction } from 'redux';
+import { ThunkDispatch } from 'redux-thunk';
+import { CLIENT_ID } from 'src/constants';
 import { ApplicationState } from 'src/store';
-import { logout } from 'src/store/authentication';
+import { handleLogout } from 'src/store/authentication/authentication.requests';
 
-interface Props {
-  dispatch: Dispatch<ApplicationState>;
-}
-
-export class Logout extends Component<Props> {
+export class Logout extends Component<DispatchProps & StateProps> {
   componentDidMount() {
-    const { dispatch } = this.props;
-
-    // Drop session info
-    session.expire();
-
-    // Reset state
-    dispatch(logout());
-
-    window.location.assign(`${LOGIN_ROOT}/logout`);
+    this.props.dispatchLogout(CLIENT_ID || '', this.props.token);
   }
 
   render() {
@@ -27,4 +17,33 @@ export class Logout extends Component<Props> {
   }
 }
 
-export default connect()<Props>(Logout);
+interface StateProps {
+  token: string;
+}
+
+const mapStateToProps: MapStateToProps<StateProps, {}, ApplicationState> = (
+  state,
+  ownProps
+) => ({
+  token: pathOr('', ['authentication', 'token'], state)
+});
+
+interface DispatchProps {
+  dispatchLogout: (client_id: string, token: string) => void;
+}
+
+const mapDispatchToProps: MapDispatchToProps<DispatchProps, {}> = (
+  dispatch: ThunkDispatch<ApplicationState, undefined, AnyAction>
+) => {
+  return {
+    dispatchLogout: (client_id: string, token: string) =>
+      dispatch(handleLogout(client_id, token))
+  };
+};
+
+const connected = connect(
+  mapStateToProps,
+  mapDispatchToProps
+);
+
+export default connected(Logout);

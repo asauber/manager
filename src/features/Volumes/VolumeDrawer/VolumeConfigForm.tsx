@@ -15,10 +15,10 @@ type ClassNames = 'root' | 'copySection' | 'copyField';
 const styles: StyleRulesCallback<ClassNames> = theme => ({
   root: {},
   copySection: {
-    marginTop: theme.spacing.unit * 2
+    marginTop: theme.spacing.unit * 3
   },
   copyField: {
-    marginTop: theme.spacing.unit
+    marginTop: theme.spacing.unit / 2
   }
 });
 
@@ -82,7 +82,7 @@ const VolumeConfigDrawer: React.StatelessComponent<CombinedProps> = props => {
           className={classes.copyField}
           value={`${props.volumePath} /mnt/${
             props.volumeLabel
-          } ext4 defaults,noatime 0 2`}
+          } ext4 defaults,noatime,nofail 0 2`}
           data-qa-boot-mount
         />
       </div>

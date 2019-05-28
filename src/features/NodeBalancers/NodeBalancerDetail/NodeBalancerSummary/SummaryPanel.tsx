@@ -12,7 +12,7 @@ import TagsPanel from 'src/components/TagsPanel';
 import styled, { StyleProps } from 'src/containers/SummaryPanels.styles';
 import IPAddress from 'src/features/linodes/LinodesLanding/IPAddress';
 import { formatRegion } from 'src/utilities';
-import { convertMegabytesTo } from 'src/utilities/convertMegabytesTo';
+import { convertMegabytesTo } from 'src/utilities/unitConversions';
 import { NodeBalancerConsumer } from '../context';
 
 type ClassNames =
@@ -67,12 +67,7 @@ const SummaryPanel: React.StatelessComponent<CombinedProps> = props => {
                 classes.NBsummarySection
               }`}
             >
-              <Typography
-                role="header"
-                variant="h3"
-                className={classes.title}
-                data-qa-title
-              >
+              <Typography variant="h3" className={classes.title} data-qa-title>
                 NodeBalancer Details
               </Typography>
               <div className={classes.section}>
@@ -124,12 +119,7 @@ const SummaryPanel: React.StatelessComponent<CombinedProps> = props => {
             </Paper>
 
             <Paper className={classes.summarySection}>
-              <Typography
-                role="header"
-                variant="h3"
-                className={classes.title}
-                data-qa-title
-              >
+              <Typography variant="h3" className={classes.title} data-qa-title>
                 IP Addresses
               </Typography>
               <div className={`${classes.section}`}>
@@ -143,12 +133,7 @@ const SummaryPanel: React.StatelessComponent<CombinedProps> = props => {
             </Paper>
 
             <Paper className={classes.summarySection}>
-              <Typography
-                role="header"
-                variant="h3"
-                className={classes.title}
-                data-qa-title
-              >
+              <Typography variant="h3" className={classes.title} data-qa-title>
                 Tags
               </Typography>
               <TagsPanel tags={nodeBalancer.tags} updateTags={updateTags} />

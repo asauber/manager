@@ -1,3 +1,4 @@
+import { pathOr } from 'ramda';
 import * as React from 'react';
 import { connect } from 'react-redux';
 import { branch, compose, renderComponent } from 'recompose';
@@ -7,12 +8,13 @@ import { eventsForLinode } from 'src/store/events/event.selectors';
 import { getLinodeConfigsForLinode } from 'src/store/linodes/config/config.selectors';
 import { getLinodeDisksForLinode } from 'src/store/linodes/disk/disk.selectors';
 import { findLinodeById } from 'src/store/linodes/linodes.selector';
+import { getPermissionsForLinode } from 'src/store/linodes/permissions/permissions.selector';
 import { getTypeById } from 'src/store/linodeType/linodeType.selector';
 import { getNotificationsForLinode } from 'src/store/notification/notification.selector';
 import { getVolumesForLinode } from 'src/store/volume/volume.selector';
 import { ExtendedLinode } from './types';
 
-interface OutterProps {
+interface OuterProps {
   linodeId: number;
 }
 
@@ -24,8 +26,8 @@ interface InnerProps {
  * Retrieve the Linode any it's extended information from Redux.
  * If the Linode cannot be found, render the NotFound component. (early return)
  */
-export default compose<InnerProps, OutterProps>(
-  connect((state: ApplicationState, ownProps: OutterProps) => {
+export default compose<InnerProps, OuterProps>(
+  connect((state: ApplicationState, ownProps: OuterProps) => {
     const { linodeId } = ownProps;
     return {
       linode: findLinodeById(state.__resources.linodes, linodeId)
@@ -43,7 +45,8 @@ export default compose<InnerProps, OutterProps>(
         notifications,
         types,
         linodeConfigs,
-        linodeDisks
+        linodeDisks,
+        profile
       } = __resources;
       const { linode, linodeId } = ownProps;
       const { type } = linode;
@@ -51,12 +54,17 @@ export default compose<InnerProps, OutterProps>(
       return {
         linode: {
           ...linode,
-          _volumes: getVolumesForLinode(volumes, linodeId),
+          _volumes: getVolumesForLinode(volumes.itemsById, linodeId),
+          _volumesError: volumes.error ? volumes.error.read : undefined,
           _notifications: getNotificationsForLinode(notifications, linodeId),
           _type: getTypeById(types, type),
           _events: eventsForLinode(events, linodeId),
           _configs: getLinodeConfigsForLinode(linodeConfigs, linodeId),
-          _disks: getLinodeDisksForLinode(linodeDisks, linodeId)
+          _disks: getLinodeDisksForLinode(linodeDisks, linodeId),
+          _permissions: getPermissionsForLinode(
+            pathOr(null, ['data'], profile),
+            linodeId
+          )
         }
       };
     }),

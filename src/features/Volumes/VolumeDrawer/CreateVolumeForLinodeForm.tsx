@@ -25,6 +25,7 @@ import { CreateVolumeSchema } from 'src/services/volumes/volumes.schema.ts';
 import { MapState } from 'src/store/types';
 import { openForAttaching } from 'src/store/volumeDrawer';
 import { getErrorStringOrDefault } from 'src/utilities/errorUtils';
+import { sendCreateVolumeEvent } from 'src/utilities/ga';
 import ConfigSelect from './ConfigSelect';
 import LabelField from './LabelField';
 import { modes } from './modes';
@@ -103,6 +104,8 @@ const CreateVolumeForm: React.StatelessComponent<CombinedProps> = props => {
               filesystem_path,
               `Volume scheduled for creation.`
             );
+            // GA Event
+            sendCreateVolumeEvent(`${label}: ${size}GiB`);
           })
           .catch(errorResponse => {
             const defaultMessage = `Unable to create a volume at this time. Please try again later.`;
@@ -132,14 +135,17 @@ const CreateVolumeForm: React.StatelessComponent<CombinedProps> = props => {
           values
         } = formikProps;
 
+        /**
+         * This form doesn't have a region select (the region is auto-populated)
+         * so if the API returns an error with field === 'region' the field mapping
+         * logic will pass over it. Explicitly use general error Notice in this case.
+         */
+        const generalError = status ? status.generalError : errors.region;
+
         return (
           <Form>
-            {status && (
-              <NoticePanel
-                success={status.success}
-                error={status.generalError}
-              />
-            )}
+            {generalError && <NoticePanel error={generalError} />}
+            {status && <NoticePanel success={status.success} />}
             {disabled && (
               <NoticePanel
                 error={

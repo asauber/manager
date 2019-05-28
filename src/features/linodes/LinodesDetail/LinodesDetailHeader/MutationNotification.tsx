@@ -1,5 +1,4 @@
-import { InjectedNotistackProps, withSnackbar } from 'notistack';
-import { pathOr } from 'ramda';
+import { withSnackbar, WithSnackbarProps } from 'notistack';
 import * as React from 'react';
 import { Link } from 'react-router-dom';
 import { compose } from 'recompose';
@@ -14,6 +13,7 @@ import {
   withTypes,
   WithTypes
 } from 'src/store/linodeType/linodeType.containers';
+import { getErrorStringOrDefault } from 'src/utilities/errorUtils';
 import { withLinodeDetailContext } from '../linodeDetailContext';
 import MutateDrawer from '../MutateDrawer';
 import withMutationDrawerState, {
@@ -35,7 +35,7 @@ const styles: StyleRulesCallback<ClassNames> = theme => ({
 type CombinedProps = MutationDrawerProps &
   ContextProps &
   WithTypes &
-  InjectedNotistackProps &
+  WithSnackbarProps &
   WithStyles<ClassNames>;
 
 const MutationNotification: React.StatelessComponent<CombinedProps> = props => {
@@ -56,7 +56,7 @@ const MutationNotification: React.StatelessComponent<CombinedProps> = props => {
 
   /** Mutate */
   if (!linodeTypeData) {
-    throw Error(`Unable to locate type information.`);
+    return null;
   }
 
   const successorId = linodeTypeData.successor;
@@ -70,7 +70,7 @@ const MutationNotification: React.StatelessComponent<CombinedProps> = props => {
     openMutationDrawer();
 
     /*
-     * It's okay to disregard the possiblity of linode
+     * It's okay to disregard the possibility of linode
      * being undefined. The upgrade message won't appear unless
      * it's defined
      */
@@ -82,10 +82,9 @@ const MutationNotification: React.StatelessComponent<CombinedProps> = props => {
         });
       })
       .catch(errors => {
-        const e = pathOr(
-          'Mutation could not be initiated.',
-          ['response', 'data', 'errors', 0, 'reason'],
-          errors
+        const e = getErrorStringOrDefault(
+          errors,
+          'Mutation could not be initiated.'
         );
         mutationFailed(e);
       });

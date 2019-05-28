@@ -6,6 +6,7 @@ import {
   Lens,
   lensPath,
   over,
+  pathOr,
   set,
   view
 } from 'ramda';
@@ -46,6 +47,7 @@ import {
 } from 'src/store/nodeBalancer/nodeBalancer.containers';
 import { MapState } from 'src/store/types';
 import { getAPIErrorOrDefault } from 'src/utilities/errorUtils';
+import { sendCreateNodeBalancerEvent } from 'src/utilities/ga';
 import getAPIErrorFor from 'src/utilities/getAPIErrorFor';
 import scrollErrorIntoView from 'src/utilities/scrollErrorIntoView';
 import NodeBalancerConfigPanel from './NodeBalancerConfigPanel';
@@ -304,9 +306,13 @@ class NodeBalancerCreate extends React.Component<CombinedProps, State> {
     this.setState({ submitting: true, errors: undefined });
 
     createNodeBalancer(nodeBalancerRequestData)
-      .then(nodeBalancer =>
-        this.props.history.push(`/nodebalancers/${nodeBalancer.id}/summary`)
-      )
+      .then(nodeBalancer => {
+        this.props.history.push(`/nodebalancers/${nodeBalancer.id}/summary`);
+        // GA Event
+        sendCreateNodeBalancerEvent(
+          `${nodeBalancer.label}: ${nodeBalancer.region}`
+        );
+      })
       .catch(errorResponse => {
         const errors = getAPIErrorOrDefault(errorResponse);
         this.setNodeErrors(
@@ -464,11 +470,7 @@ class NodeBalancerCreate extends React.Component<CombinedProps, State> {
         <DocumentTitleSegment segment="Create a NodeBalancer" />
         <Grid container>
           <Grid item className={`${classes.main} mlMain`}>
-            <Typography
-              role="header"
-              variant="h1"
-              data-qa-create-nodebalancer-header
-            >
+            <Typography variant="h1" data-qa-create-nodebalancer-header>
               Create a NodeBalancer
             </Typography>
 
@@ -511,12 +513,12 @@ class NodeBalancerCreate extends React.Component<CombinedProps, State> {
             <SelectRegionPanel
               regions={regionsData || []}
               error={hasErrorFor('region')}
-              selectedID={nodeBalancerFields.region || null}
+              selectedID={nodeBalancerFields.region}
               handleSelection={this.regionChange}
               disabled={disabled}
             />
             <Grid item xs={12}>
-              <Typography role="header" variant="h2" className={classes.title}>
+              <Typography variant="h2" className={classes.title}>
                 NodeBalancer Settings
               </Typography>
             </Grid>
@@ -691,7 +693,7 @@ class NodeBalancerCreate extends React.Component<CombinedProps, State> {
 
         <ConfirmationDialog
           onClose={this.onCloseConfirmation}
-          title="Confirm Deletion"
+          title={'Delete this configuration?'}
           error={this.confirmationConfigError()}
           actions={this.renderConfigConfirmationActions}
           open={this.state.deleteConfigConfirmDialog.open}
@@ -754,7 +756,7 @@ export const fieldErrorsToNodePathErrors = (errors: Linode.ApiFieldError[]) => {
       }
   */
   return errors.reduce((acc: any, error: Linode.ApiFieldError) => {
-    const errorFields = error.field!.split('|');
+    const errorFields = pathOr('', ['field'], error).split('|');
     const pathErrors: FieldAndPath[] = errorFields.map((field: string) =>
       getPathAndFieldFromFieldString(field)
     );

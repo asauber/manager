@@ -21,6 +21,7 @@ import {
   WithNodeBalancerActions
 } from 'src/store/nodeBalancer/nodeBalancer.containers';
 import defaultNumeric from 'src/utilities/defaultNumeric';
+import { getAPIErrorOrDefault } from 'src/utilities/errorUtils';
 import getAPIErrorFor from 'src/utilities/getAPIErrorFor';
 import scrollErrorIntoView from 'src/utilities/scrollErrorIntoView';
 
@@ -122,7 +123,7 @@ class NodeBalancerSettings extends React.Component<CombinedProps, State> {
       })
       .catch(error => {
         this.setState(
-          { isSubmitting: false, errors: error.response.data.errors },
+          { isSubmitting: false, errors: getAPIErrorOrDefault(error) },
           () => {
             scrollErrorIntoView();
           }
@@ -139,7 +140,7 @@ class NodeBalancerSettings extends React.Component<CombinedProps, State> {
     return (
       <React.Fragment>
         <DocumentTitleSegment segment={`${nodeBalancerLabel} - Settings`} />
-        <Typography role="header" variant="h1" className={classes.title}>
+        <Typography variant="h1" className={classes.title}>
           Settings
         </Typography>
         <Paper className={classes.root}>

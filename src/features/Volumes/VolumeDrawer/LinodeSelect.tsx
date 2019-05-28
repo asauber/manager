@@ -1,7 +1,6 @@
 import { pathOr } from 'ramda';
 import * as React from 'react';
 import _Option from 'react-select/lib/components/Option';
-import FormControl from 'src/components/core/FormControl';
 import FormHelperText from 'src/components/core/FormHelperText';
 import {
   StyleRulesCallback,
@@ -182,7 +181,7 @@ export class LinodeSelect extends React.Component<CombinedProps, State> {
       : linodes;
 
     return (
-      <FormControl fullWidth>
+      <>
         <EnhancedSelect
           onBlur={onBlur}
           name={name}
@@ -194,7 +193,9 @@ export class LinodeSelect extends React.Component<CombinedProps, State> {
           options={[{ label: 'Select a Linode', value: -1 }, ...options]}
           onChange={this.setSelectedLinode}
           onInputChange={this.onInputChange}
-          data-qa-select-linode
+          textFieldProps={{
+            'data-qa-select-linode': true
+          }}
           {...rest}
         />
         {!error && (
@@ -203,7 +204,7 @@ export class LinodeSelect extends React.Component<CombinedProps, State> {
             Only Linodes in the selected region are displayed.
           </FormHelperText>
         )}
-      </FormControl>
+      </>
     );
   }
 }

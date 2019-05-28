@@ -141,6 +141,7 @@ namespace Linode {
     public: IPAddress[];
     private: IPAddress[];
     shared: IPAddress[];
+    reserved: IPAddress[];
   }
 
   export interface LinodeIPsResponseIPV6 {
@@ -158,7 +159,8 @@ namespace Linode {
     | 'provisioning'
     | 'deleting'
     | 'migrating'
-    | 'cloning';
+    | 'cloning'
+    | 'restoring';
 
   export interface Config {
     id: number;
@@ -208,21 +210,27 @@ namespace Linode {
 
   export type BootAction = 'reboot' | 'power_down' | null;
 
+  export type KebabAction = BootAction | 'delete';
+
   interface NetStats {
-    in: number[][];
-    out: number[][];
-    private_in: number[][];
-    private_out: number[][];
+    in: [number, number][];
+    out: [number, number][];
+    private_in: [number, number][];
+    private_out: [number, number][];
+  }
+
+  export interface StatsData {
+    cpu: [number, number][];
+    io: {
+      io: [number, number][];
+      swap: [number, number][];
+    };
+    netv4: NetStats;
+    netv6: NetStats;
   }
 
   export interface Stats {
     title: string;
-    cpu: number[][];
-    io: {
-      io: number[][];
-      swap: number[][];
-    };
-    netv4: NetStats;
-    netv6: NetStats;
+    data: StatsData;
   }
 }

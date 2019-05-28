@@ -33,7 +33,7 @@ import {
   WithNodeBalancerActions
 } from 'src/store/nodeBalancer/nodeBalancer.containers';
 import { nodeBalancersWithConfigs } from 'src/store/nodeBalancer/nodeBalancer.selectors';
-import { sendEvent } from 'src/utilities/analytics';
+import { sendGroupByTagEnabledEvent } from 'src/utilities/ga';
 import scrollErrorIntoView from 'src/utilities/scrollErrorIntoView';
 import ListGroupedNodeBalancers from './ListGroupedNodeBalancers';
 import ListNodeBalancers from './ListNodeBalancers';
@@ -94,6 +94,7 @@ interface DeleteConfirmDialogState {
 interface State {
   deleteConfirmDialog: DeleteConfirmDialogState;
   selectedNodeBalancerId?: number;
+  selectedNodeBalancerLabel: string;
 }
 
 type CombinedProps = WithNodeBalancerActions &
@@ -116,14 +117,34 @@ export class NodeBalancersLanding extends React.Component<
   };
 
   state: State = {
-    deleteConfirmDialog: NodeBalancersLanding.defaultDeleteConfirmDialogState
+    deleteConfirmDialog: NodeBalancersLanding.defaultDeleteConfirmDialogState,
+    selectedNodeBalancerLabel: ''
   };
+
+  pollInterval: number;
+
+  componentDidMount() {
+    /**
+     * To keep NB node status up to date, poll NodeBalancers and configs every 30 seconds while the
+     * user is on this page.
+     */
+    const { getAllNodeBalancersWithConfigs } = this.props.nodeBalancerActions;
+    this.pollInterval = window.setInterval(
+      () => getAllNodeBalancersWithConfigs(),
+      30 * 1000
+    );
+  }
+
+  componentWillUnmount() {
+    clearInterval(this.pollInterval);
+  }
 
   static docs = [NodeBalancerGettingStarted, NodeBalancerReference];
 
-  toggleDialog = (nodeBalancerId: number) => {
+  toggleDialog = (nodeBalancerId: number, label: string) => {
     this.setState({
       selectedNodeBalancerId: nodeBalancerId,
+      selectedNodeBalancerLabel: label,
       deleteConfirmDialog: {
         ...this.state.deleteConfirmDialog,
         open: !this.state.deleteConfirmDialog.open
@@ -150,7 +171,7 @@ export class NodeBalancersLanding extends React.Component<
     });
 
     deleteNodeBalancer({ nodeBalancerId: selectedNodeBalancerId })
-      .then(response => {
+      .then(_ => {
         this.setState({
           deleteConfirmDialog: {
             open: false,
@@ -224,12 +245,7 @@ export class NodeBalancersLanding extends React.Component<
           style={{ paddingBottom: 0 }}
         >
           <Grid item className={classes.titleWrapper}>
-            <Typography
-              role="header"
-              variant="h1"
-              data-qa-title
-              className={classes.title}
-            >
+            <Typography variant="h1" data-qa-title className={classes.title}>
               NodeBalancers
             </Typography>
           </Grid>
@@ -279,7 +295,7 @@ export class NodeBalancersLanding extends React.Component<
         </OrderBy>
         <ConfirmationDialog
           onClose={this.closeConfirmationDialog}
-          title="Confirm Deletion"
+          title={`Delete ${this.state.selectedNodeBalancerLabel}?`}
           error={(this.state.deleteConfirmDialog.errors || [])
             .map(e => e.reason)
             .join(',')}
@@ -361,11 +377,7 @@ const withLocalStorage = localStorageContainer<
     toggleGroupByTag: state => (checked: boolean) => {
       storage.groupNodeBalancersByTag.set(checked ? 'true' : 'false');
 
-      sendEvent({
-        category: NodeBalancersLanding.eventCategory,
-        action: 'group by tag',
-        label: String(checked)
-      });
+      sendGroupByTagEnabledEvent(NodeBalancersLanding.eventCategory, checked);
 
       return {
         ...state,
@@ -379,13 +391,19 @@ export const enhanced = compose<CombinedProps, {}>(
   connect((state: ApplicationState) => {
     const { __resources } = state;
     const { nodeBalancers } = __resources;
-    const { error, items, loading: nodeBalancersLoading } = nodeBalancers;
+    const {
+      error,
+      items,
+      loading: nodeBalancersLoading,
+      lastUpdated
+    } = nodeBalancers;
 
     return {
       nodeBalancersCount: items.length,
       nodeBalancersData: nodeBalancersWithConfigs(__resources),
       nodeBalancersError: error,
-      nodeBalancersLoading
+      // In this component we only want to show loading state on initial load
+      nodeBalancersLoading: nodeBalancersLoading && lastUpdated === 0
     };
   }),
   withLocalStorage,

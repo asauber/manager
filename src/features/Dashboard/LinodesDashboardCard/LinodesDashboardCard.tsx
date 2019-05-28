@@ -1,4 +1,4 @@
-import { compose, pathOr, prop, sortBy, take } from 'ramda';
+import { compose, path, pathOr, prop, sortBy, take } from 'ramda';
 import * as React from 'react';
 import { connect } from 'react-redux';
 import { Link } from 'react-router-dom';
@@ -16,6 +16,7 @@ import TableRow from 'src/components/TableRow';
 import TableRowEmptyState from 'src/components/TableRowEmptyState';
 import TableRowError from 'src/components/TableRowError';
 import TableRowLoading from 'src/components/TableRowLoading';
+import ViewAllLink from 'src/components/ViewAllLink';
 import LinodeRowHeadCell from 'src/features/linodes/LinodesLanding/LinodeRow/LinodeRowHeadCell';
 import RegionIndicator from 'src/features/linodes/LinodesLanding/RegionIndicator';
 import { ApplicationState } from 'src/store';
@@ -24,7 +25,6 @@ import {
   isInProgressEvent
 } from 'src/store/events/event.helpers';
 import DashboardCard from '../DashboardCard';
-import ViewAllLink from '../ViewAllLink';
 
 type ClassNames =
   | 'root'
@@ -141,6 +141,7 @@ class LinodesDashboardCard extends React.Component<CombinedProps> {
         <TableRow key={label} rowLink={`/linodes/${id}`} data-qa-linode>
           <LinodeRowHeadCell
             loading={false}
+            recentEvent={linode.recentEvent}
             backups={linode.backups}
             id={linode.id}
             ipv4={linode.ipv4}
@@ -194,7 +195,7 @@ const withUpdatingLinodes = connect((state: ApplicationState, ownProps: {}) => {
     )(state.__resources.linodes.entities),
     linodeCount: state.__resources.linodes.entities.length,
     loading: state.__resources.linodes.loading,
-    error: state.__resources.linodes.error
+    error: path(['read'], state.__resources.linodes.error)
   };
 });
 

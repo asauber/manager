@@ -1,12 +1,21 @@
-import { AxiosError } from 'axios';
 import { pathOr } from 'ramda';
+import { DEFAULT_ERROR_MESSAGE } from 'src/constants';
 
 /**
+ *
+ * Override the default error message provided by our Axios
+ * interceptor with a more situation-specific message.
+ *
+ * @todo rename this method
+ * @todo make the second argument required, so we're not
+ * overriding the default error with the same default error
+ * in some cases.
+ *
  * @example
  *
  * fetchData()
  *  .then()
- *  .catch((e: AxiosError) => getAPIErrorOrDefault(e, 'There was an error', 'label'))
+ *  .catch((e: Linode.ApiFieldError[]) => getAPIErrorOrDefault(e, 'There was an error', 'label'))
  *
  * @param { AxiosError } - Error response from some API request
  * @param { string } - Default error message on the "reason" key
@@ -18,15 +27,59 @@ import { pathOr } from 'ramda';
  *
  */
 export const getAPIErrorOrDefault = (
-  errorResponse: AxiosError,
-  defaultError: string = 'An unexpected error occurred.',
+  errorResponse: Linode.ApiFieldError[],
+  defaultError: string = DEFAULT_ERROR_MESSAGE,
   field?: string
 ): Linode.ApiFieldError[] => {
   const _defaultError = field
     ? [{ reason: defaultError, field }]
     : [{ reason: defaultError }];
 
-  return pathOr(_defaultError, ['response', 'data', 'errors'], errorResponse);
+  return isDefaultError(errorResponse) ? _defaultError : errorResponse;
+};
+
+const isDefaultError = (errorResponse: Linode.ApiFieldError[]) => {
+  return (
+    errorResponse &&
+    errorResponse.length === 1 &&
+    errorResponse[0].reason === DEFAULT_ERROR_MESSAGE
+  );
+};
+
+export const handleUnauthorizedErrors = (
+  e: Linode.ApiFieldError[],
+  unauthedMessage: string
+) => {
+  /**
+   * filter out errors that match the following
+   * {
+   *   reason: "Unauthorized"
+   * }
+   *
+   * and if any of these errors exist, set the hasUnauthorizedError
+   * flag to true
+   */
+  let hasUnauthorizedError = false;
+  const filteredErrors = e.filter(eachError => {
+    if (eachError.reason.toLowerCase().includes('unauthorized')) {
+      hasUnauthorizedError = true;
+      return false;
+    }
+    return true;
+  });
+
+  /**
+   * if we found an unauthorized error, add on the new message in the API
+   * Error format
+   */
+  return hasUnauthorizedError
+    ? [
+        {
+          reason: unauthedMessage
+        },
+        ...filteredErrors
+      ]
+    : filteredErrors;
 };
 
 export const getErrorStringOrDefault = (
@@ -36,7 +89,8 @@ export const getErrorStringOrDefault = (
   if (typeof errors === 'string') {
     return errors;
   }
-  return pathOr<string>(defaultError, [0, 'reason'], errors);
+  const apiErrors = pathOr(errors, ['response', 'data', 'errors'], errors);
+  return pathOr<string>(defaultError, [0, 'reason'], apiErrors);
 };
 
 /**

@@ -13,7 +13,6 @@ type Event = ExtendedEvent;
 export const epoch = new Date(`1970-01-01T00:00:00.000`).getTime();
 
 /**
-
  * Safely find an entity in a list of entities returning the index.
  * Will return -1 if the index is not found.
  *
@@ -132,9 +131,12 @@ export const isEntityEvent = (e: Linode.Event): e is Linode.EntityEvent =>
  * If an event is "completed" it is removed from the inProgressEvents map.
  * Otherwise the inProgressEvents is unchanged.
  *
+ * @retuns { [key: number]: number } inProgressEvents: key value pair, where the
+ * key will be the ID of the event and the value will be the percent_complete
+ *
  */
 export const updateInProgressEvents = (
-  inProgressEvents: Record<number, boolean>,
+  inProgressEvents: Record<number, number>,
   event: Pick<Event, 'percent_complete' | 'id'>[]
 ) => {
   return event.reduce((result, e) => {
@@ -144,7 +146,9 @@ export const updateInProgressEvents = (
       return omit([key], result);
     }
 
-    return isInProgressEvent(e) ? { ...result, [key]: true } : result;
+    return isInProgressEvent(e)
+      ? { ...result, [key]: e.percent_complete }
+      : result;
   }, inProgressEvents);
 };
 

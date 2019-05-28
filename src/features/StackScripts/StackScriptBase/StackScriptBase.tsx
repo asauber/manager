@@ -1,24 +1,31 @@
 import { pathOr } from 'ramda';
 import * as React from 'react';
 import { connect } from 'react-redux';
-import { Link } from 'react-router-dom';
 import Waypoint from 'react-waypoint';
 import { compose } from 'recompose';
+import StackScriptsIcon from 'src/assets/addnewmenu/stackscripts.svg';
 import Button from 'src/components/Button';
 import CircleProgress from 'src/components/CircleProgress';
 import DebouncedSearch from 'src/components/DebouncedSearchTextField';
 import ErrorState from 'src/components/ErrorState';
 import Notice from 'src/components/Notice';
+import Placeholder from 'src/components/Placeholder';
 import Table from 'src/components/Table';
-import { isRestrictedUser } from 'src/features/Profile/permissionsHelpers';
+import {
+  hasGrant,
+  isRestrictedUser
+} from 'src/features/Profile/permissionsHelpers';
 import { MapState } from 'src/store/types';
-import { sendEvent } from 'src/utilities/analytics';
+import {
+  getAPIErrorOrDefault,
+  handleUnauthorizedErrors
+} from 'src/utilities/errorUtils';
+import { sendStackscriptsSearchEvent } from 'src/utilities/ga';
 import StackScriptTableHead from '../Partials/StackScriptTableHead';
 import {
   AcceptedFilters,
   generateCatchAllFilter,
-  generateSpecificFilter,
-  getErrorText
+  generateSpecificFilter
 } from '../stackScriptUtils';
 import withStyles, { StyleProps } from './StackScriptBase.styles';
 
@@ -45,7 +52,7 @@ export interface State {
   currentFilter: any; // @TODO type correctly
   currentSearchFilter: any;
   isSorting: boolean;
-  error?: Error;
+  error?: Linode.ApiFieldError[];
   fieldError: Linode.ApiFieldError | undefined;
   isSearching: boolean;
   didSearch: boolean;
@@ -54,6 +61,7 @@ export interface State {
 
 interface StoreProps {
   stackScriptGrants?: Linode.Grant[];
+  userCannotCreateStackScripts: boolean;
 }
 
 type CombinedProps = StyleProps & StoreProps & any;
@@ -98,7 +106,7 @@ const withStackScriptBase = (isSelecting: boolean) => (
 
     componentDidMount() {
       this.mounted = true;
-      return this.getDataAtPage(0);
+      return this.getDataAtPage(1);
     }
 
     componentWillUnmount() {
@@ -147,7 +155,7 @@ const withStackScriptBase = (isSelecting: boolean) => (
           /*
            * BEGIN @TODO: deprecate this once compound filtering becomes available in the API
            * basically, if the result set after filtering out StackScripts with
-           * deprecated distos is 0, request the next page with the same filter.
+           * deprecated distros is 0, request the next page with the same filter.
            */
           const newDataWithoutDeprecatedDistros = newData.filter(stackScript =>
             this.hasNonDeprecatedImages(stackScript.images)
@@ -180,7 +188,10 @@ const withStackScriptBase = (isSelecting: boolean) => (
             this.setState({ getMoreStackScriptsFailed: true });
           }
           this.setState({
-            error: e.response,
+            error: getAPIErrorOrDefault(
+              e,
+              'There was an error loading StackScripts'
+            ),
             loading: false,
             gettingMoreStackScripts: false
           });
@@ -316,11 +327,7 @@ const withStackScriptBase = (isSelecting: boolean) => (
         didSearch: true // table will show default empty state unless didSearch is true
       });
 
-      sendEvent({
-        category: 'stackscripts',
-        action: 'search',
-        label: lowerCaseValue
-      });
+      sendStackscriptsSearchEvent(lowerCaseValue);
 
       request(
         filteredUser,
@@ -356,7 +363,13 @@ const withStackScriptBase = (isSelecting: boolean) => (
           if (!this.mounted) {
             return;
           }
-          this.setState({ error: e, isSearching: false });
+          this.setState({
+            error: getAPIErrorOrDefault(
+              e,
+              'There was an error loading StackScripts'
+            ),
+            isSearching: false
+          });
         });
     };
 
@@ -376,12 +389,19 @@ const withStackScriptBase = (isSelecting: boolean) => (
         getMoreStackScriptsFailed
       } = this.state;
 
-      const { classes } = this.props;
+      const { classes, userCannotCreateStackScripts } = this.props;
 
       if (error) {
         return (
           <div style={{ overflow: 'hidden' }}>
-            <ErrorState errorText={getErrorText(error)} />
+            <ErrorState
+              errorText={
+                handleUnauthorizedErrors(
+                  error,
+                  'You are not authorized to view StackScripts for this account.'
+                )[0].reason
+              }
+            />
           </div>
         );
       }
@@ -405,8 +425,25 @@ const withStackScriptBase = (isSelecting: boolean) => (
           listOfStackScripts &&
           listOfStackScripts.length === 0 ? (
             <div className={classes.emptyState} data-qa-stackscript-empty-msg>
-              You do not have any StackScripts to select from. You must first
-              <Link to="/stackscripts/create"> create one.</Link>
+              {userCannotCreateStackScripts ? (
+                <Placeholder
+                  icon={StackScriptsIcon}
+                  title="StackScripts"
+                  copy="You don't have any StackScripts to select from."
+                  className={classes.stackscriptPlaceholder}
+                />
+              ) : (
+                <Placeholder
+                  icon={StackScriptsIcon}
+                  title="StackScripts"
+                  copy="You don't have any StackScripts to select from."
+                  buttonProps={{
+                    href: '/stackscripts/create',
+                    children: 'Create a StackScript'
+                  }}
+                  className={classes.stackscriptPlaceholder}
+                />
+              )}
             </div>
           ) : (
             <React.Fragment>
@@ -499,7 +536,9 @@ const withStackScriptBase = (isSelecting: boolean) => (
           ['__resources', 'profile', 'data', 'grants', 'stackscript'],
           state
         )
-      : undefined
+      : undefined,
+    userCannotCreateStackScripts:
+      isRestrictedUser(state) && !hasGrant(state, 'add_stackscripts')
   });
 
   const connected = connect(mapStateToProps);

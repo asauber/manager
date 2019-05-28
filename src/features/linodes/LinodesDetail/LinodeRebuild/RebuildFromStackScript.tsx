@@ -1,4 +1,6 @@
-import { InjectedNotistackProps, withSnackbar } from 'notistack';
+import { Formik, FormikProps } from 'formik';
+import { withSnackbar, WithSnackbarProps } from 'notistack';
+import { isEmpty } from 'ramda';
 import * as React from 'react';
 import { RouteComponentProps, withRouter } from 'react-router';
 import { compose } from 'recompose';
@@ -22,13 +24,22 @@ import userSSHKeyHoc, {
 } from 'src/features/linodes/userSSHKeyHoc';
 import SelectStackScriptPanel from 'src/features/StackScripts/SelectStackScriptPanel';
 import StackScriptDrawer from 'src/features/StackScripts/StackScriptDrawer';
+import {
+  getCommunityStackscripts,
+  getMineAndAccountStackScripts
+} from 'src/features/StackScripts/stackScriptUtils';
 import UserDefinedFieldsPanel from 'src/features/StackScripts/UserDefinedFieldsPanel';
-import { useErrors } from 'src/hooks/useErrors';
-import { useForm } from 'src/hooks/useForm';
+// @todo: Extract these utils out of Volumes
+import {
+  handleFieldErrors,
+  handleGeneralErrors
+} from 'src/features/Volumes/VolumeDrawer/utils';
 import { useStackScript } from 'src/hooks/useStackScript';
 import { rebuildLinode } from 'src/services/linodes';
-import { getAPIErrorOrDefault, getErrorMap } from 'src/utilities/errorUtils';
+import { RebuildLinodeFromStackScriptSchema } from 'src/services/linodes/linode.schema';
+import { getAPIErrorOrDefault } from 'src/utilities/errorUtils';
 import { filterPublicImages } from 'src/utilities/images';
+import scrollErrorIntoView from 'src/utilities/scrollErrorIntoView';
 import { withLinodeDetailContext } from '../linodeDetailContext';
 import { RebuildDialog } from './RebuildDialog';
 
@@ -50,6 +61,10 @@ const styles: StyleRulesCallback<ClassNames> = theme => ({
   }
 });
 
+interface Props {
+  type: 'community' | 'account';
+}
+
 interface ContextProps {
   linodeId: number;
 }
@@ -59,17 +74,25 @@ interface WithImagesProps {
   imagesError?: string;
 }
 
-interface RebuildFromStackScriptForm {
-  imageID: string;
-  password: string;
-}
-
-export type CombinedProps = WithStyles<ClassNames> &
+export type CombinedProps = Props &
+  WithStyles<ClassNames> &
   WithImagesProps &
   ContextProps &
   UserSSHKeyProps &
   RouteComponentProps &
-  InjectedNotistackProps;
+  WithSnackbarProps;
+
+interface RebuildFromStackScriptForm {
+  image: string;
+  root_pass: string;
+  stackscript_id: string;
+}
+
+const initialValues: RebuildFromStackScriptForm = {
+  image: '',
+  root_pass: '',
+  stackscript_id: ''
+};
 
 export const RebuildFromStackScript: React.StatelessComponent<
   CombinedProps
@@ -90,95 +113,85 @@ export const RebuildFromStackScript: React.StatelessComponent<
     resetStackScript
   ] = useStackScript(imagesData);
 
-  const [form, setField, resetForm] = useForm<RebuildFromStackScriptForm>({
-    imageID: '',
-    password: ''
-  });
+  // In this component, most errors are handled by Formik. This is not
+  // possible with UDFs, since they are dynamic. Their errors need to
+  // be handled separately.
+  const [udfErrors, setUdfErrors] = React.useState<
+    Linode.ApiFieldError[] | undefined
+  >(undefined);
 
-  const [errors, setErrors, resetErrors] = useErrors();
   const [isDialogOpen, setIsDialogOpen] = React.useState<boolean>(false);
-  const [isLoading, setIsLoading] = React.useState<boolean>(false);
 
-  const handleSelect = (
-    id: number,
-    label: string,
-    username: string,
-    stackScriptImages: string[],
-    user_defined_fields: Linode.StackScript.UserDefinedField[]
+  const handleFormSubmit = (
+    { image, root_pass }: RebuildFromStackScriptForm,
+    {
+      setSubmitting,
+      setStatus,
+      setErrors
+    }: FormikProps<RebuildFromStackScriptForm>
   ) => {
-    handleSelectStackScript(
-      id,
-      label,
-      username,
-      stackScriptImages,
-      user_defined_fields
-    );
-    // Reset Image ID so that that an incompatible image can't be submitted accidentally
-    setField('imageID', '');
-  };
-
-  const handleSubmit = () => {
-    // @todo: Ideally we would do form validation BEFORE opening up the
-    // confirmation dialog.
-
-    // StackScript ID is technically an optional field on the rebuildLinode
-    // request, so we need to explicitly check for it here.
-    if (!ss.id) {
-      setErrors([
-        { field: 'stackscript_id', reason: 'You must select a StackScript' }
-      ]);
-      return;
-    }
-
-    setIsLoading(true);
+    setSubmitting(true);
 
     rebuildLinode(linodeId, {
       stackscript_id: ss.id,
       stackscript_data: ss.udf_data,
-      root_pass: form.password,
-      image: form.imageID,
+      root_pass,
+      image,
       authorized_users: userSSHKeys.filter(u => u.selected).map(u => u.username)
     })
       .then(_ => {
+        // Reset events polling since an in-progress event (rebuild) is happening.
         resetEventsPolling();
-        resetForm();
-        resetErrors();
-        setIsLoading(false);
+
+        setSubmitting(false);
         setIsDialogOpen(false);
+
         enqueueSnackbar('Linode rebuild started', {
           variant: 'info'
         });
         history.push(`/linodes/${linodeId}/summary`);
       })
       .catch(errorResponse => {
-        setIsLoading(false);
-        setIsDialogOpen(false);
+        const APIError = getAPIErrorOrDefault(errorResponse);
+        setUdfErrors(getUDFErrors(APIError));
 
-        setErrors(
-          getAPIErrorOrDefault(
-            errorResponse,
-            'There was an issue rebuilding your Linode.'
-          )
-        );
+        const defaultMessage = `There was an issue rebuilding your Linode.`;
+        const mapErrorToStatus = (generalError: string) =>
+          setStatus({ generalError });
+
+        setSubmitting(false);
+
+        handleFieldErrors(setErrors, errorResponse);
+        handleGeneralErrors(mapErrorToStatus, errorResponse, defaultMessage);
+
+        setIsDialogOpen(false);
+        scrollErrorIntoView();
       });
   };
 
-  // The error handling below could probably go into the useErrors() hook.
-  const fixedErrorFields = ['stackscript_id', 'root_pass', 'image', 'none'];
+  // Since UDFs are dynamic, they are not handled by Formik. They need
+  // to be validated separately. This functions checks if we've got values
+  // for all REQUIRED UDFs, and sets errors appropriately.
+  const validateUdfs = () => {
+    const maybeErrors: Linode.ApiFieldError[] = [];
 
-  const hasErrorFor = getErrorMap(
-    [
-      ...fixedErrorFields,
-      ...ss.user_defined_fields.map(
-        (udf: Linode.StackScript.UserDefinedField) => udf.name
-      )
-    ],
-    errors
-  );
-  const generalError = hasErrorFor.none;
-  const udfErrors = getUDFErrors(fixedErrorFields, errors);
+    // Walk through the defined UDFs
+    ss.user_defined_fields.forEach(eachUdf => {
+      // Is it required? Do we have a value?
+      if (isUDFRequired(eachUdf) && !ss.udf_data[eachUdf.name]) {
+        // If not, we've got an error.
+        maybeErrors.push({
+          field: eachUdf.name,
+          reason: `A value for the ${eachUdf.name} is required.`
+        });
+      }
+    });
+
+    return maybeErrors;
+  };
 
   return (
+<<<<<<< HEAD
     <Grid item className={classes.root}>
       {generalError && (
         <Notice
@@ -262,6 +275,160 @@ export const RebuildFromStackScript: React.StatelessComponent<
       />
       <StackScriptDrawer />
     </Grid>
+=======
+    <Formik
+      initialValues={initialValues}
+      validationSchema={RebuildLinodeFromStackScriptSchema}
+      validateOnChange={false}
+      onSubmit={handleFormSubmit}
+      render={formikProps => {
+        const {
+          errors,
+          handleSubmit,
+          isSubmitting,
+          setFieldValue,
+          status,
+          values,
+          validateForm
+        } = formikProps;
+
+        // The "Rebuild" button opens a confirmation modal.
+        // We'd like to validate the form before this happens.
+        const handleRebuildButtonClick = () => {
+          // Validate stackscript_id, image, & root_pass
+          validateForm().then(maybeErrors => {
+            // UDFs are not part of Formik - validate separately.
+            const maybeUDFErrors = validateUdfs();
+            setUdfErrors(maybeUDFErrors);
+
+            // If there aren't any errors, we can open the modal.
+            if (isEmpty(maybeErrors) && maybeUDFErrors.length === 0) {
+              setIsDialogOpen(true);
+              // The form receives the errors automatically, and we scroll them into view.
+            } else {
+              scrollErrorIntoView();
+            }
+          });
+        };
+
+        const handleSelect = (
+          id: number,
+          label: string,
+          username: string,
+          stackScriptImages: string[],
+          user_defined_fields: Linode.StackScript.UserDefinedField[]
+        ) => {
+          handleSelectStackScript(
+            id,
+            label,
+            username,
+            stackScriptImages,
+            user_defined_fields
+          );
+          // Reset Image ID so that that an incompatible image can't be submitted accidentally
+          setFieldValue('stackscript_id', id);
+          setFieldValue('image', '');
+        };
+
+        return (
+          <Grid item className={classes.root}>
+            {status && (
+              <Notice
+                error
+                className={classes.error}
+                text={status.generalError}
+                data-qa-notice
+              />
+            )}
+            <SelectStackScriptPanel
+              error={errors.stackscript_id}
+              selectedId={ss.id}
+              selectedUsername={ss.username}
+              updateFor={[classes, ss.id, errors]}
+              onSelect={handleSelect}
+              publicImages={filterPublicImages(imagesData)}
+              resetSelectedStackScript={resetStackScript}
+              data-qa-select-stackscript
+              category={props.type}
+              header="Select StackScript"
+              request={
+                props.type === 'account'
+                  ? getMineAndAccountStackScripts
+                  : getCommunityStackscripts
+              }
+            />
+            {ss.user_defined_fields && ss.user_defined_fields.length > 0 && (
+              <UserDefinedFieldsPanel
+                errors={udfErrors}
+                selectedLabel={ss.label}
+                selectedUsername={ss.username}
+                handleChange={handleChangeUDF}
+                userDefinedFields={ss.user_defined_fields}
+                updateFor={[
+                  classes,
+                  ss.user_defined_fields,
+                  ss.udf_data,
+                  udfErrors
+                ]}
+                udf_data={ss.udf_data}
+              />
+            )}
+            {ss.images && ss.images.length > 0 ? (
+              <SelectImagePanel
+                variant="public"
+                images={ss.images}
+                handleSelection={selected => setFieldValue('image', selected)}
+                updateFor={[classes, values.image, ss.images, errors]}
+                selectedImageID={values.image}
+                error={errors.image}
+              />
+            ) : (
+              <Paper className={classes.emptyImagePanel}>
+                {/* empty state for images */}
+                {errors.image && <Notice error={true} text={errors.image} />}
+                <Typography variant="h2" data-qa-tp="Select Image">
+                  Select Image
+                </Typography>
+                <Typography
+                  variant="body1"
+                  className={classes.emptyImagePanelText}
+                  data-qa-no-compatible-images
+                >
+                  No Compatible Images Available
+                </Typography>
+              </Paper>
+            )}
+            <AccessPanel
+              password={values.root_pass}
+              handleChange={value => setFieldValue('root_pass', value)}
+              updateFor={[values.root_pass, errors, userSSHKeys, ss.id]}
+              error={errors.root_pass}
+              users={userSSHKeys}
+              data-qa-access-panel
+            />
+            <ActionsPanel>
+              <Button
+                type="secondary"
+                className="destructive"
+                onClick={handleRebuildButtonClick}
+                data-qa-rebuild
+                data-testid="rebuild-button"
+              >
+                Rebuild
+              </Button>
+            </ActionsPanel>
+            <RebuildDialog
+              isOpen={isDialogOpen}
+              isLoading={isSubmitting}
+              handleClose={() => setIsDialogOpen(false)}
+              handleSubmit={handleSubmit}
+            />
+            <StackScriptDrawer />
+          </Grid>
+        );
+      }}
+    />
+>>>>>>> aa9dec28f5b8cc095e1da60f974a7dfd064434c6
   );
 };
 
@@ -271,7 +438,7 @@ const linodeContext = withLinodeDetailContext(({ linode }) => ({
   linodeId: linode.id
 }));
 
-const enhanced = compose<CombinedProps, {}>(
+const enhanced = compose<CombinedProps, Props>(
   linodeContext,
   userSSHKeyHoc,
   styled,
@@ -291,10 +458,9 @@ export default enhanced(RebuildFromStackScript);
 // Helpers
 // =============================================================================
 
-const getUDFErrors = (
-  fixedErrorFields: string[],
-  errors: Linode.ApiFieldError[] | undefined
-) => {
+const getUDFErrors = (errors: Linode.ApiFieldError[] | undefined) => {
+  const fixedErrorFields = ['stackscript_id', 'root_pass', 'image', 'none'];
+
   return errors
     ? errors.filter(error => {
         // ensure the error isn't a root_pass, image, or none
@@ -306,3 +472,6 @@ const getUDFErrors = (
       })
     : undefined;
 };
+
+const isUDFRequired = (udf: Linode.StackScript.UserDefinedField) =>
+  !udf.hasOwnProperty('default');

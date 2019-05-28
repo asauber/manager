@@ -1,12 +1,11 @@
-import { compose, dec, lensPath, path, pathOr, remove, set } from 'ramda';
+import { dec, lensPath, path, remove, set } from 'ramda';
 import * as React from 'react';
 import { connect, MapDispatchToProps } from 'react-redux';
+import { compose } from 'recompose';
 import ActionsPanel from 'src/components/ActionsPanel';
 import AddNewLink from 'src/components/AddNewLink';
 import Button from 'src/components/Button';
 import FormControl from 'src/components/core/FormControl';
-import FormHelperText from 'src/components/core/FormHelperText';
-import InputLabel from 'src/components/core/InputLabel';
 import Paper from 'src/components/core/Paper';
 import {
   StyleRulesCallback,
@@ -16,14 +15,14 @@ import {
 import Typography from 'src/components/core/Typography';
 import setDocs from 'src/components/DocsSidebar/setDocs';
 import { DocumentTitleSegment } from 'src/components/DocumentTitle';
-import MenuItem from 'src/components/MenuItem';
+import Select, { Item } from 'src/components/EnhancedSelect/Select';
 import Notice from 'src/components/Notice';
-import Select from 'src/components/Select';
 import TextField from 'src/components/TextField';
 import { LISH } from 'src/documentation';
 import { updateProfile } from 'src/services/profile';
 import { handleUpdate } from 'src/store/profile/profile.actions';
 import { MapState } from 'src/store/types';
+import { getAPIErrorOrDefault } from 'src/utilities/errorUtils';
 import getAPIErrorFor from 'src/utilities/getAPIErrorFor';
 import scrollErrorIntoView from 'src/utilities/scrollErrorIntoView';
 
@@ -120,16 +119,30 @@ class LishSettings extends React.Component<CombinedProps, State> {
     const authMethodError = hasErrorFor('lish_auth_method');
     const authorizedKeysError = hasErrorFor('authorized_keys');
 
+    const modeOptions = [
+      {
+        label: 'Allow both password and key authentication',
+        value: 'password_keys'
+      },
+      {
+        label: 'Allow key authentication only',
+        value: 'keys_only'
+      },
+      {
+        label: 'Disable Lish',
+        value: 'disabled'
+      }
+    ];
+
+    const defaultMode = modeOptions.find(eachMode => {
+      return eachMode.value === lishAuthMethod;
+    });
+
     return (
       <React.Fragment>
         <DocumentTitleSegment segment="Lish" />
         <Paper className={classes.root}>
-          <Typography
-            role="header"
-            variant="h2"
-            className={classes.title}
-            data-qa-title
-          >
+          <Typography variant="h2" className={classes.title} data-qa-title>
             LISH
           </Typography>
           {success && <Notice success text={success} />}
@@ -142,31 +155,16 @@ class LishSettings extends React.Component<CombinedProps, State> {
           {loading ? null : (
             <React.Fragment>
               <FormControl className={classes.modeControl}>
-                <InputLabel
-                  htmlFor="mode-select"
-                  disableAnimation
-                  shrink={true}
-                >
-                  Authentication Mode
-                </InputLabel>
-                <div>
-                  <Select
-                    inputProps={{ name: 'mode-select', id: 'mode-select' }}
-                    value={lishAuthMethod}
-                    onChange={this.onListAuthMethodChange}
-                  >
-                    <MenuItem value={'password_keys'}>
-                      Allow both password and key authentication
-                    </MenuItem>
-                    <MenuItem value={'keys_only'}>
-                      Allow key authentication only
-                    </MenuItem>
-                    <MenuItem value={'disabled'}>Disable Lish</MenuItem>
-                  </Select>
-                  {authMethodError && (
-                    <FormHelperText error>{authMethodError}</FormHelperText>
-                  )}
-                </div>
+                <Select
+                  options={modeOptions}
+                  name="mode-select"
+                  id="mode-select"
+                  defaultValue={defaultMode}
+                  onChange={this.onListAuthMethodChange}
+                  label="Authentication Mode"
+                  isClearable={false}
+                  errorText={authMethodError}
+                />
               </FormControl>
               {Array.from(Array(authorizedKeysCount)).map((value, idx) => (
                 <div className={classes.sshWrap} key={idx}>
@@ -242,15 +240,10 @@ class LishSettings extends React.Component<CombinedProps, State> {
         );
       })
       .catch(error => {
-        const fallbackError = [{ reason: 'An unexpected error has occured.' }];
         this.setState(
           {
             submitting: false,
-            errors: pathOr(
-              fallbackError,
-              ['response', 'data', 'errors'],
-              error
-            ),
+            errors: getAPIErrorOrDefault(error),
             success: undefined
           },
           () => {
@@ -260,8 +253,8 @@ class LishSettings extends React.Component<CombinedProps, State> {
       });
   };
 
-  onListAuthMethodChange = (e: React.ChangeEvent<HTMLSelectElement>) =>
-    this.setState({ lishAuthMethod: e.target.value });
+  onListAuthMethodChange = (e: Item<string>) =>
+    this.setState({ lishAuthMethod: e.value });
 
   onPublicKeyChange = (idx: number) => (
     e: React.ChangeEvent<HTMLInputElement>
@@ -313,7 +306,7 @@ const connected = connect(
   mapDispatchToProps
 );
 
-const enhanced = compose(
+const enhanced = compose<CombinedProps, {}>(
   styled,
   connected,
   setDocs(LishSettings.docs)

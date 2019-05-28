@@ -15,21 +15,26 @@ interface Props {
   ) => void;
   attached: boolean;
   onAttach: (volumeId: number, label: string, linodeRegion: string) => void;
-  onDetach: (volumeId: number) => void;
+  onDetach: (
+    volumeId: number,
+    volumeLabel: string,
+    linodeLabel: string
+  ) => void;
   poweredOff: boolean;
-  onDelete: (volumeId: number) => void;
+  onDelete: (volumeId: number, volumeLabel: string) => void;
   filesystemPath: string;
   label: string;
   linodeLabel: string;
   regionID: string;
   volumeId: number;
+  volumeLabel: string;
   volumeTags: string[];
   size: number;
 }
 
 type CombinedProps = Props & RouteComponentProps<{}>;
 
-class VolumesActionMenu extends React.Component<CombinedProps> {
+export class VolumesActionMenu extends React.Component<CombinedProps> {
   handleShowConfig = () => {
     const { onShowConfig, label, filesystemPath } = this.props;
     onShowConfig(label, filesystemPath);
@@ -56,13 +61,13 @@ class VolumesActionMenu extends React.Component<CombinedProps> {
   };
 
   handleDetach = () => {
-    const { volumeId, onDetach } = this.props;
-    onDetach(volumeId);
+    const { volumeId, onDetach, volumeLabel, linodeLabel } = this.props;
+    onDetach(volumeId, volumeLabel, linodeLabel);
   };
 
   handleDelete = () => {
-    const { volumeId, onDelete } = this.props;
-    onDelete(volumeId);
+    const { volumeId, onDelete, volumeLabel } = this.props;
+    onDelete(volumeId, volumeLabel);
   };
 
   createActions = () => {

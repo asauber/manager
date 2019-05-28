@@ -32,10 +32,11 @@ describe('ListLinodes', () => {
             linodesRequestError={undefined}
             linodesRequestLoading={false}
             managed={false}
-            onPresentSnackbar={jest.fn()}
+            closeSnackbar={jest.fn()}
             setDocs={setDocs}
             toggleGroupByTag={jest.fn()}
             backupsCTA={false}
+            deleteLinode={jest.fn()}
           />
         </StaticRouter>
       </LinodeThemeWrapper>
@@ -59,10 +60,11 @@ describe('ListLinodes', () => {
             linodesRequestError={undefined}
             linodesRequestLoading={false}
             managed={false}
-            onPresentSnackbar={jest.fn()}
+            closeSnackbar={jest.fn()}
             setDocs={setDocs}
             toggleGroupByTag={jest.fn()}
             backupsCTA={false}
+            deleteLinode={jest.fn()}
           />
         </StaticRouter>
       </LinodeThemeWrapper>
@@ -91,10 +93,11 @@ describe('ListLinodes', () => {
             linodesRequestError={undefined}
             linodesRequestLoading={false}
             managed={false}
-            onPresentSnackbar={jest.fn()}
+            closeSnackbar={jest.fn()}
             setDocs={setDocs}
             toggleGroupByTag={jest.fn()}
             backupsCTA={false}
+            deleteLinode={jest.fn()}
           />
         </StaticRouter>
       </LinodeThemeWrapper>

@@ -1,5 +1,7 @@
 import { pathOr } from 'ramda';
 import * as React from 'react';
+import { connect } from 'react-redux';
+import { compose } from 'recompose';
 import CircleProgress from 'src/components/CircleProgress';
 import Paper from 'src/components/core/Paper';
 import {
@@ -13,6 +15,8 @@ import Grid from 'src/components/Grid';
 import LineGraph from 'src/components/LineGraph';
 import MetricsDisplay from 'src/features/linodes/LinodesDetail/LinodeSummary/MetricsDisplay';
 import { getNodeBalancerStats } from 'src/services/nodebalancers';
+import { ApplicationState } from 'src/store';
+import { initAll } from 'src/utilities/initAll';
 import {
   formatBitsPerSecond,
   formatNumber,
@@ -117,7 +121,7 @@ interface State {
   statsError?: string;
 }
 
-type CombinedProps = Props & WithStyles<ClassNames>;
+type CombinedProps = Props & StateProps & WithStyles<ClassNames>;
 
 const statsFetchInterval = 30000;
 
@@ -181,7 +185,9 @@ class TablesPanel extends React.Component<CombinedProps, State> {
           return;
         }
         this.setState({
-          stats: response,
+          // Occasionally the last reading of each stats reading is incorrect, so we drop
+          // the last element of each array in the stats response.
+          stats: initAll(response),
           loadingStats: false,
           statsError: undefined
         });
@@ -195,7 +201,11 @@ class TablesPanel extends React.Component<CombinedProps, State> {
           ['reason'],
           errorResponse[0]
         );
-        this.setState({ loadingStats: false, statsError });
+
+        /** only show an error if stats aren't already loaded */
+        return !this.state.stats
+          ? this.setState({ loadingStats: false, statsError })
+          : this.setState({ loadingStats: false });
       });
   };
 
@@ -219,7 +229,7 @@ class TablesPanel extends React.Component<CombinedProps, State> {
     statsError: string | undefined,
     loadingStats: boolean
   ) => {
-    const { classes } = this.props;
+    const { classes, timezone } = this.props;
     const { stats } = this.state;
     const data = pathOr([[]], ['data', 'connections'], stats);
 
@@ -233,7 +243,7 @@ class TablesPanel extends React.Component<CombinedProps, State> {
 
     return (
       <React.Fragment>
-        <Typography role="header" variant="h3" className={classes.header}>
+        <Typography variant="h3" className={classes.header}>
           Connections (5 min avg.)
         </Typography>
         <React.Fragment>
@@ -245,6 +255,7 @@ class TablesPanel extends React.Component<CombinedProps, State> {
               connections/sec
             </div>
             <LineGraph
+              timezone={timezone}
               showToday={true}
               data={[
                 {
@@ -280,7 +291,7 @@ class TablesPanel extends React.Component<CombinedProps, State> {
     statsError: string | undefined,
     loadingStats: boolean
   ) => {
-    const { classes } = this.props;
+    const { classes, timezone } = this.props;
     const { stats } = this.state;
     const trafficIn = pathOr([[]], ['data', 'traffic', 'in'], stats);
     const trafficOut = pathOr([[]], ['data', 'traffic', 'out'], stats);
@@ -293,13 +304,14 @@ class TablesPanel extends React.Component<CombinedProps, State> {
     }
     return (
       <React.Fragment>
-        <Typography role="header" variant="h3" className={classes.header}>
+        <Typography variant="h3" className={classes.header}>
           Traffic (5 min avg.)
         </Typography>
         <React.Fragment>
           <div className={classes.chart}>
             <div className={classes.leftLegend}>bits/sec</div>
             <LineGraph
+              timezone={timezone}
               showToday={true}
               data={[
                 {
@@ -345,9 +357,7 @@ class TablesPanel extends React.Component<CombinedProps, State> {
       <React.Fragment>
         <React.Fragment>
           <div className={classes.graphControls}>
-            <Typography role="header" variant="h2">
-              Graphs
-            </Typography>
+            <Typography variant="h2">Graphs</Typography>
           </div>
           <Paper className={classes.panel}>
             {this.renderConnectionsChart(statsError, loadingStats)}
@@ -361,6 +371,19 @@ class TablesPanel extends React.Component<CombinedProps, State> {
   }
 }
 
+interface StateProps {
+  timezone: string;
+}
+
+const withTimezone = connect((state: ApplicationState, ownProps) => ({
+  timezone: pathOr('UTC', ['__resources', 'profile', 'data', 'timezone'], state)
+}));
+
 const styled = withStyles(styles);
 
-export default styled(TablesPanel);
+const enhanced = compose<CombinedProps, Props>(
+  styled,
+  withTimezone
+);
+
+export default enhanced(TablesPanel);

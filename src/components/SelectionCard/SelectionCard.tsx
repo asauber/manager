@@ -88,7 +88,7 @@ const styles: StyleRulesCallback<CSSClasses> = theme => ({
     }
   },
   heading: {
-    fontFamily: 'LatoWebBold',
+    fontFamily: theme.font.bold,
     fontSize: '1rem',
     color: theme.color.headline
   },
@@ -227,7 +227,7 @@ class SelectionCard extends React.PureComponent<CombinedProps, {}> {
         item
         xs={12}
         sm={6}
-        md={4}
+        lg={4}
         xl={3}
         tabIndex={0}
         className={classNames({

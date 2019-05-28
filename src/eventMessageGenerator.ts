@@ -12,6 +12,12 @@ interface CreatorsForStatus {
 
 /** @see https://leo.stcloudstate.edu/grammar/tenses.html */
 export const eventMessageCreators: { [index: string]: CreatorsForStatus } = {
+  account_update: {
+    notification: e => `Your account settings have been updated.`
+  },
+  account_settings_update: {
+    notification: e => `Your account settings have been updated.`
+  },
   backups_cancel: {
     notification: e => `Backups have been cancelled for ${e.entity!.label}.`
   },
@@ -125,6 +131,24 @@ export const eventMessageCreators: { [index: string]: CreatorsForStatus } = {
     started: e => `Linode ${e.entity!.label} is booting.`,
     failed: e => `Linode ${e.entity!.label} could not be booted.`,
     finished: e => `Linode ${e.entity!.label} has booted.`
+  },
+  lassie_reboot: {
+    scheduled: e => `Linode ${e.entity!.label} is scheduled to be rebooted by the Lassie watchdog service.`,
+    started: e => `Linode ${e.entity!.label} is being booted by the Lassie watchdog service.`,
+    failed: e => `Linode ${e.entity!.label} could not be booted by the Lassie watchdog service.`,
+    finished: e => `Linode ${e.entity!.label} has been booted by the Lassie watchdog service.`
+  },
+  host_reboot: {
+    scheduled: e => `Linode ${e.entity!.label} is scheduled to reboot (Host initiated restart).`,
+    started: e => `Linode ${e.entity!.label} is booting (Host initiated restart).`,
+    failed: e => `Linode ${e.entity!.label} could not be booted (Host initiated restart).`,
+    finished: e => `Linode ${e.entity!.label} has booted (Host initiated restart).`
+  },
+  lish_boot: {
+    scheduled: e => `Linode ${e.entity!.label} is scheduled to boot (Lish initiated boot).`,
+    started: e => `Linode ${e.entity!.label} is booting (Lish initiated boot).`,
+    failed: e => `Linode ${e.entity!.label} could not be booted (Lish initiated boot).`,
+    finished: e => `Linode ${e.entity!.label} has booted (Lish initiated boot).`
   },
   linode_clone: {
     scheduled: e => `Linode ${e.entity!.label} is scheduled to be cloned.`,
@@ -301,13 +325,6 @@ export const eventMessageCreators: { [index: string]: CreatorsForStatus } = {
   tfa_enabled: {
     notification: e => `Two-factor authentication has been enabled.`
   },
-  // ticket_attachment_upload: {
-  //   scheduled: e => ``,
-  //   started: e => ``,
-  //   failed: e => ``,
-  //   finished: e => ``,
-  //   notification: e => ``,
-  // },
   ticket_create: {
     notification: e => `New support ticket "${e.entity!.label}" created.`
   },
@@ -320,6 +337,10 @@ export const eventMessageCreators: { [index: string]: CreatorsForStatus } = {
   // },
   ticket_update: {
     notification: e => `Support ticket "${e.entity!.label}" has been updated.`
+  },
+  ticket_attachment_upload: {
+    notification: e =>
+      `File has been successfully uploaded to support ticket ${e.entity!.label}`
   },
   volume_attach: {
     // @todo Once we have better events, display the name of the attached Linode
@@ -375,7 +396,7 @@ export const eventMessageCreators: { [index: string]: CreatorsForStatus } = {
 
 export default (
   e: Linode.Event,
-  onUnfound?: (e: Linode.Event) => void,
+  onUnfound?: (e: Linode.Event) => string | void,
   onError?: (e: Linode.Event, err: Error) => void
 ) => {
   const fn = path<EventMessageCreator>(
@@ -385,7 +406,7 @@ export default (
 
   if (!fn) {
     if (onUnfound) {
-      onUnfound(e);
+      return onUnfound(e);
     }
     return;
   }

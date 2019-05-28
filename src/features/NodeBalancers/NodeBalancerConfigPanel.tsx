@@ -16,6 +16,7 @@ import {
   WithStyles
 } from 'src/components/core/styles';
 import Typography from 'src/components/core/Typography';
+import Select, { Item } from 'src/components/EnhancedSelect/Select';
 import Grid from 'src/components/Grid';
 import Notice from 'src/components/Notice';
 import TextField from 'src/components/TextField';
@@ -121,7 +122,7 @@ interface Props {
   forEdit?: boolean;
   submitting?: boolean;
   onSave?: () => void;
-  onDelete?: () => void;
+  onDelete?: any;
 
   algorithm: 'roundrobin' | 'leastconn' | 'source';
   onAlgorithmChange: (v: string) => void;
@@ -186,8 +187,8 @@ class NodeBalancerConfigPanel extends React.Component<CombinedProps> {
 
   static defaultProps: Partial<Props> = {};
 
-  onAlgorithmChange = (e: React.ChangeEvent<HTMLInputElement>) =>
-    this.props.onAlgorithmChange(e.target.value);
+  onAlgorithmChange = (e: Item<string>) =>
+    this.props.onAlgorithmChange(e.value);
 
   onCheckPassiveChange = (
     e: React.ChangeEvent<HTMLInputElement>,
@@ -209,8 +210,8 @@ class NodeBalancerConfigPanel extends React.Component<CombinedProps> {
   onHealthCheckTimeoutChange = (e: React.ChangeEvent<HTMLInputElement>) =>
     this.props.onHealthCheckTimeoutChange(e.target.value);
 
-  onHealthCheckTypeChange = (e: React.ChangeEvent<HTMLInputElement>) =>
-    this.props.onHealthCheckTypeChange(e.target.value);
+  onHealthCheckTypeChange = (e: Item<string>) =>
+    this.props.onHealthCheckTypeChange(e.value);
 
   onPortChange = (e: React.ChangeEvent<HTMLInputElement>) =>
     this.props.onPortChange(e.target.value);
@@ -218,13 +219,11 @@ class NodeBalancerConfigPanel extends React.Component<CombinedProps> {
   onPrivateKeyChange = (e: React.ChangeEvent<HTMLInputElement>) =>
     this.props.onPrivateKeyChange(e.target.value);
 
-  onProtocolChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  onProtocolChange = (e: Item<string>) => {
     const { healthCheckType } = this.props;
-    const {
-      target: { value: protocol }
-    } = e;
+    const { value: protocol } = e;
 
-    this.props.onProtocolChange(e.target.value);
+    this.props.onProtocolChange(e.value);
 
     if (
       protocol === 'tcp' &&
@@ -240,8 +239,8 @@ class NodeBalancerConfigPanel extends React.Component<CombinedProps> {
     }
   };
 
-  onSessionStickinessChange = (e: React.ChangeEvent<HTMLInputElement>) =>
-    this.props.onSessionStickinessChange(e.target.value);
+  onSessionStickinessChange = (e: Item<string>) =>
+    this.props.onSessionStickinessChange(e.value);
 
   onSslCertificateChange = (e: React.ChangeEvent<HTMLInputElement>) =>
     this.props.onSslCertificateChange(e.target.value);
@@ -312,8 +311,6 @@ class NodeBalancerConfigPanel extends React.Component<CombinedProps> {
   };
 
   onSave = this.props.onSave;
-
-  onDelete = this.props.onDelete;
 
   handleSelectSuggestion = (selection: string) => {
     const { currentNodeAddressIndex } = this.state;
@@ -407,6 +404,32 @@ class NodeBalancerConfigPanel extends React.Component<CombinedProps> {
 
     const conditionalText = this.displayProtocolText(protocol);
 
+    const typeOptions = [
+      {
+        label: 'None',
+        value: 'none'
+      },
+      {
+        label: 'TCP Connection',
+        value: 'connection',
+        isDisabled: protocol === 'http' || protocol === 'https'
+      },
+      {
+        label: 'HTTP Status',
+        value: 'http',
+        disabled: protocol === 'tcp'
+      },
+      {
+        label: 'HTTP Body',
+        value: 'http_body',
+        disabled: protocol === 'tcp'
+      }
+    ];
+
+    const defaultType = typeOptions.find(eachType => {
+      return eachType.value === healthCheckType;
+    });
+
     return (
       <Grid item xs={12} md={4} xl={2}>
         <Grid container>
@@ -415,7 +438,7 @@ class NodeBalancerConfigPanel extends React.Component<CombinedProps> {
             item
             xs={12}
           >
-            <Typography role="header" variant="h2" data-qa-active-checks-header>
+            <Typography variant="h2" data-qa-active-checks-header>
               Active Health Checks
             </Typography>
           </Grid>
@@ -431,33 +454,19 @@ class NodeBalancerConfigPanel extends React.Component<CombinedProps> {
             xs={12}
           >
             <Grid item xs={12}>
-              <TextField
+              <Select
+                options={typeOptions}
                 label="Type"
-                value={healthCheckType}
-                select
+                defaultValue={defaultType || typeOptions[0]}
                 onChange={this.onHealthCheckTypeChange}
                 errorText={hasErrorFor('check')}
                 errorGroup={forEdit ? `${configIdx}` : undefined}
                 data-qa-active-check-select
                 small
                 disabled={disabled}
-              >
-                <MenuItem value="none">None</MenuItem>
-                <MenuItem
-                  value="connection"
-                  disabled={protocol === 'http' || protocol === 'https'}
-                >
-                  TCP Connection
-                </MenuItem>
-
-                <MenuItem value="http" disabled={protocol === 'tcp'}>
-                  HTTP Status
-                </MenuItem>
-
-                <MenuItem value="http_body" disabled={protocol === 'tcp'}>
-                  HTTP Body
-                </MenuItem>
-              </TextField>
+                isClearable={false}
+                noMarginTop
+              />
               <FormHelperText>
                 Active health checks proactively check the health of back-end
                 nodes. {conditionalText}
@@ -491,6 +500,7 @@ class NodeBalancerConfigPanel extends React.Component<CombinedProps> {
                   errorGroup={forEdit ? `${configIdx}` : undefined}
                   data-qa-active-check-interval
                   disabled={disabled}
+                  small
                 />
                 <FormHelperText>
                   Seconds between health check probes
@@ -521,6 +531,7 @@ class NodeBalancerConfigPanel extends React.Component<CombinedProps> {
                   errorGroup={forEdit ? `${configIdx}` : undefined}
                   data-qa-active-check-timeout
                   disabled={disabled}
+                  small
                 />
                 <FormHelperText>
                   Seconds to wait before considering the probe a failure. 1-30.
@@ -550,6 +561,7 @@ class NodeBalancerConfigPanel extends React.Component<CombinedProps> {
                   }}
                   data-qa-active-check-attempts
                   disabled={disabled}
+                  small
                 />
                 <FormHelperText>
                   Number of failed probes before taking a node out of rotation.
@@ -577,6 +589,7 @@ class NodeBalancerConfigPanel extends React.Component<CombinedProps> {
                     errorText={hasErrorFor('check_path')}
                     errorGroup={forEdit ? `${configIdx}` : undefined}
                     disabled={disabled}
+                    small
                   />
                 </Grid>
               )}
@@ -601,6 +614,7 @@ class NodeBalancerConfigPanel extends React.Component<CombinedProps> {
                     errorText={hasErrorFor('check_body')}
                     errorGroup={forEdit ? `${configIdx}` : undefined}
                     disabled={disabled}
+                    small
                   />
                 </Grid>
               )}
@@ -618,11 +632,7 @@ class NodeBalancerConfigPanel extends React.Component<CombinedProps> {
       <Grid item xs={12} md={6}>
         <Grid updateFor={[checkPassive, classes]} container>
           <Grid item xs={12}>
-            <Typography
-              role="header"
-              variant="h2"
-              data-qa-passive-checks-header
-            >
+            <Typography variant="h2" data-qa-passive-checks-header>
               Passive Checks
             </Typography>
           </Grid>
@@ -689,10 +699,49 @@ class NodeBalancerConfigPanel extends React.Component<CombinedProps> {
       errors
     );
 
+    const globalFormError = hasErrorFor('none');
+
+    const protocolOptions = [
+      { label: 'TCP', value: 'tcp' },
+      { label: 'HTTP', value: 'http' },
+      { label: 'HTTPS', value: 'https' }
+    ];
+
+    const defaultProtocol = protocolOptions.find(eachProtocol => {
+      return eachProtocol.value === protocol;
+    });
+
+    const algOptions = [
+      { label: 'Round Robin', value: 'roundrobin' },
+      { label: 'Least Connections', value: 'leastconn' },
+      { label: 'Source', value: 'source' }
+    ];
+
+    const defaultAlg = algOptions.find(eachAlg => {
+      return eachAlg.value === algorithm;
+    });
+
+    const sessionOptions = [
+      { label: 'None', value: 'none' },
+      { label: 'Table', value: 'table' },
+      { label: 'HTTP Cookie', value: 'http_cookie' }
+    ];
+
+    const defaultSession = sessionOptions.find(eachSession => {
+      return eachSession.value === sessionStickiness;
+    });
+
     return (
       <Grid item xs={12}>
         <Paper className={classes.root} data-qa-label-header>
           <div className={classes.inner}>
+            {globalFormError && (
+              <Notice
+                className={`error-for-scroll-${configIdx}`}
+                text={globalFormError}
+                error={true}
+              />
+            )}
             <Grid
               updateFor={[
                 port,
@@ -713,20 +762,16 @@ class NodeBalancerConfigPanel extends React.Component<CombinedProps> {
               container
             >
               <Grid item xs={12}>
-                <Typography
-                  role="header"
-                  variant="h2"
-                  data-qa-port-config-header
-                >
+                <Typography variant="h2" data-qa-port-config-header>
                   Port Configuration
                 </Typography>
               </Grid>
-              <Grid item xs={6} sm={4} md={3} lg={2}>
+              <Grid item xs={6} md={3}>
                 <TextField
                   type="number"
                   label="Port"
                   required
-                  value={port || ''}
+                  defaultValue={port || ''}
                   onChange={this.onPortChange}
                   errorText={hasErrorFor('port') || hasErrorFor('configs')}
                   errorGroup={forEdit ? `${configIdx}` : undefined}
@@ -736,28 +781,20 @@ class NodeBalancerConfigPanel extends React.Component<CombinedProps> {
                 />
                 <FormHelperText>Listen on this port</FormHelperText>
               </Grid>
-              <Grid item xs={6} sm={4} md={3} lg={2}>
-                <TextField
+              <Grid item xs={6} md={3}>
+                <Select
+                  options={protocolOptions}
                   label="Protocol"
-                  value={protocol}
-                  select
+                  defaultValue={defaultProtocol || protocolOptions[0]}
                   onChange={this.onProtocolChange}
                   errorText={hasErrorFor('protocol')}
                   errorGroup={forEdit ? `${configIdx}` : undefined}
                   data-qa-protocol-select
-                  small
                   disabled={disabled}
-                >
-                  <MenuItem value="tcp" data-qa-option="tcp">
-                    TCP
-                  </MenuItem>
-                  <MenuItem value="http" data-qa-option="http">
-                    HTTP
-                  </MenuItem>
-                  <MenuItem value="https" data-qa-option="https">
-                    HTTPS
-                  </MenuItem>
-                </TextField>
+                  noMarginTop
+                  small
+                  isClearable={false}
+                />
               </Grid>
 
               {protocol === 'https' && (
@@ -808,28 +845,20 @@ class NodeBalancerConfigPanel extends React.Component<CombinedProps> {
                 </Grid>
               )}
 
-              <Grid item xs={6} sm={4} md={3} lg={2}>
-                <TextField
+              <Grid item xs={6} md={3}>
+                <Select
+                  options={algOptions}
                   label="Algorithm"
-                  value={algorithm}
-                  select
+                  defaultValue={defaultAlg || algOptions[0]}
                   onChange={this.onAlgorithmChange}
                   errorText={hasErrorFor('algorithm')}
                   errorGroup={forEdit ? `${configIdx}` : undefined}
                   data-qa-algorithm-select
                   small
                   disabled={disabled}
-                >
-                  <MenuItem value="roundrobin" data-qa-option="roundrobin">
-                    Round Robin
-                  </MenuItem>
-                  <MenuItem value="leastconn" data-qa-option="leastconn">
-                    Least Connections
-                  </MenuItem>
-                  <MenuItem value="source" data-qa-option="source">
-                    Source
-                  </MenuItem>
-                </TextField>
+                  isClearable={false}
+                  noMarginTop
+                />
                 <FormHelperText>
                   Roundrobin. Least connections assigns connections to the
                   backend with the least connections. Source uses the client's
@@ -837,28 +866,20 @@ class NodeBalancerConfigPanel extends React.Component<CombinedProps> {
                 </FormHelperText>
               </Grid>
 
-              <Grid item xs={6} sm={4} md={3} lg={2}>
-                <TextField
+              <Grid item xs={6} md={3}>
+                <Select
+                  options={sessionOptions}
                   label="Session Stickiness"
-                  value={sessionStickiness}
-                  select
+                  defaultValue={defaultSession || sessionOptions[1]}
                   onChange={this.onSessionStickinessChange}
                   errorText={hasErrorFor('stickiness')}
                   errorGroup={forEdit ? `${configIdx}` : undefined}
                   data-qa-session-stickiness-select
                   small
                   disabled={disabled}
-                >
-                  <MenuItem value="none" data-qa-option="none">
-                    None
-                  </MenuItem>
-                  <MenuItem value="table" data-qa-option="table">
-                    Table
-                  </MenuItem>
-                  <MenuItem value="http_cookie" data-qa-option="http_cookie">
-                    HTTP Cookie
-                  </MenuItem>
-                </TextField>
+                  isClearable={false}
+                  noMarginTop
+                />
                 <FormHelperText>
                   Route subsequent requests from the client to the same backend
                 </FormHelperText>
@@ -880,11 +901,7 @@ class NodeBalancerConfigPanel extends React.Component<CombinedProps> {
                 <Grid updateFor={[nodeMessage, classes]} item xs={12}>
                   {nodeMessage && <Notice text={nodeMessage} success />}
                 </Grid>
-                <Typography
-                  role="header"
-                  variant="h2"
-                  data-qa-backend-ip-header
-                >
+                <Typography variant="h2" data-qa-backend-ip-header>
                   Backend Nodes
                 </Typography>
                 {hasErrorFor('nodes') && (
@@ -959,7 +976,6 @@ class NodeBalancerConfigPanel extends React.Component<CombinedProps> {
                               {node.status && (
                                 <Grid item xs={6} sm={4} lg={2}>
                                   <Typography
-                                    role="header"
                                     variant="h3"
                                     data-qa-active-checks-header
                                     className={classes.statusHeader}
@@ -1214,7 +1230,7 @@ class NodeBalancerConfigPanel extends React.Component<CombinedProps> {
                   alignItems="center"
                 >
                   <Grid item>
-                    <ActionsPanel>
+                    <ActionsPanel style={{ paddingLeft: 0 }}>
                       {forEdit && (
                         <Button
                           type="primary"
@@ -1228,7 +1244,7 @@ class NodeBalancerConfigPanel extends React.Component<CombinedProps> {
                       )}
                       {(forEdit || configIdx !== 0) && (
                         <Button
-                          onClick={this.onDelete}
+                          onClick={this.props.onDelete}
                           type="secondary"
                           destructive
                           data-qa-delete-config

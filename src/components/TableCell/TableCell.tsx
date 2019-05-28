@@ -8,7 +8,7 @@ import {
 } from 'src/components/core/styles';
 import TableCell, { TableCellProps } from 'src/components/core/TableCell';
 
-type ClassNames = 'root' | 'noWrap' | 'sortable' | 'data';
+type ClassNames = 'root' | 'noWrap' | 'sortable' | 'data' | 'compact';
 
 const styles: StyleRulesCallback<ClassNames> = theme => ({
   root: {},
@@ -34,9 +34,12 @@ const styles: StyleRulesCallback<ClassNames> = theme => ({
   data: {
     [theme.breakpoints.down('sm')]: {
       textAlign: 'right',
-      wordBreak: 'break-all',
+      width: '100%',
       marginLeft: theme.spacing.unit * 3
     }
+  },
+  compact: {
+    padding: 6
   }
 });
 
@@ -49,6 +52,7 @@ export interface Props extends TableCellProps {
    * TableCell is listed under
    */
   parentColumn?: string;
+  compact?: boolean;
 }
 
 type CombinedProps = Props & WithStyles<ClassNames>;
@@ -61,6 +65,7 @@ class WrappedTableCell extends React.Component<CombinedProps> {
       parentColumn,
       noWrap,
       sortable,
+      compact,
       ...rest
     } = this.props;
 
@@ -70,6 +75,7 @@ class WrappedTableCell extends React.Component<CombinedProps> {
           [classes.root]: true,
           [classes.noWrap]: noWrap,
           [classes.sortable]: sortable,
+          [classes.compact]: compact,
           // hide the cell at small breakpoints if it's empty with no parent column
           emptyCell: !parentColumn && !this.props.children
         })}
@@ -80,7 +86,7 @@ class WrappedTableCell extends React.Component<CombinedProps> {
             <Hidden mdUp>
               <span>{parentColumn}</span>
             </Hidden>
-            <span className={classes.data}>{this.props.children}</span>
+            <div className={`${classes.data} data`}>{this.props.children}</div>
           </React.Fragment>
         ) : (
           this.props.children

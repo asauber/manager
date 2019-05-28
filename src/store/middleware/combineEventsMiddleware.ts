@@ -33,8 +33,11 @@ const eventsMiddlewareFactory = (
       /**
        * We can bail immediately if there is no associated entity since we need an entity
        * to update the store.
+       *
+       * but we still need to dispatch the action to add the event to the store
        */
       if (!isEntityEvent(event)) {
+        next(action);
         return;
       }
 
@@ -50,12 +53,8 @@ const eventsMiddlewareFactory = (
        * interval to keep things moving quickly.
        */
       if (isInProgressEvent(event)) {
-        /**
-         * purely experimental - no real reason for the number 4
-         * the main point here is we don't want to poll the events endpoint
-         * excessively
-         */
-        resetEventsPolling(4);
+        // If the event is in_progress, we poll more aggressively
+        resetEventsPolling();
       }
     }
   }

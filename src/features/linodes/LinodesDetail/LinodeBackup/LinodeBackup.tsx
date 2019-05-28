@@ -1,5 +1,5 @@
 import * as moment from 'moment-timezone';
-import { InjectedNotistackProps, withSnackbar } from 'notistack';
+import { withSnackbar, WithSnackbarProps } from 'notistack';
 import { path, pathOr, sortBy } from 'ramda';
 import * as React from 'react';
 import { connect } from 'react-redux';
@@ -13,8 +13,6 @@ import Button from 'src/components/Button';
 import ConfirmationDialog from 'src/components/ConfirmationDialog';
 import FormControl from 'src/components/core/FormControl';
 import FormHelperText from 'src/components/core/FormHelperText';
-import InputLabel from 'src/components/core/InputLabel';
-import MenuItem from 'src/components/core/MenuItem';
 import Paper from 'src/components/core/Paper';
 import {
   StyleRulesCallback,
@@ -28,11 +26,13 @@ import Tooltip from 'src/components/core/Tooltip';
 import Typography from 'src/components/core/Typography';
 import Currency from 'src/components/Currency';
 import { DocumentTitleSegment } from 'src/components/DocumentTitle';
+import Select, { Item } from 'src/components/EnhancedSelect/Select';
+import ErrorState from 'src/components/ErrorState';
+import Notice from 'src/components/Notice';
 import Placeholder from 'src/components/Placeholder';
 import PromiseLoader, {
   PromiseLoaderResponse
 } from 'src/components/PromiseLoader';
-import Select from 'src/components/Select';
 import Table from 'src/components/Table';
 import TableCell from 'src/components/TableCell';
 import TextField from 'src/components/TextField';
@@ -50,11 +50,16 @@ import {
   withLinodeActions
 } from 'src/store/linodes/linode.containers';
 import { MapState } from 'src/store/types';
-import { getAPIErrorOrDefault } from 'src/utilities/errorUtils';
+import { getAPIErrorOrDefault, getErrorMap } from 'src/utilities/errorUtils';
 import { formatDate } from 'src/utilities/formatDate';
+import {
+  sendBackupsDisabledEvent,
+  sendBackupsEnabledEvent
+} from 'src/utilities/ga';
 import getAPIErrorFor from 'src/utilities/getAPIErrorFor';
 import scrollErrorIntoView from 'src/utilities/scrollErrorIntoView';
 import { withLinodeDetailContext } from '../linodeDetailContext';
+import LinodePermissionsError from '../LinodePermissionsError';
 import BackupTableRow from './BackupTableRow';
 import RestoreToLinodeDrawer from './RestoreToLinodeDrawer';
 
@@ -62,9 +67,12 @@ type ClassNames =
   | 'paper'
   | 'title'
   | 'subTitle'
+  | 'snapshotNameField'
   | 'snapshotFormControl'
+  | 'snapshotGeneralError'
   | 'scheduleAction'
   | 'chooseTime'
+  | 'chooseDay'
   | 'cancelButton';
 
 const styles: StyleRulesCallback<ClassNames> = theme => ({
@@ -82,11 +90,14 @@ const styles: StyleRulesCallback<ClassNames> = theme => ({
   snapshotFormControl: {
     display: 'flex',
     flexDirection: 'row',
-    alignItems: 'flex-end',
+    alignItems: 'flex-start',
     flexWrap: 'wrap',
     '& > div': {
       width: 'auto',
       marginRight: theme.spacing.unit * 2
+    },
+    '& button': {
+      marginTop: theme.spacing.unit * 4
     }
   },
   scheduleAction: {
@@ -99,8 +110,17 @@ const styles: StyleRulesCallback<ClassNames> = theme => ({
   chooseTime: {
     marginRight: theme.spacing.unit * 2
   },
+  chooseDay: {
+    minWidth: 150
+  },
   cancelButton: {
     marginBottom: theme.spacing.unit
+  },
+  snapshotNameField: {
+    minWidth: 275
+  },
+  snapshotGeneralError: {
+    minWidth: '100%'
   }
 });
 
@@ -112,6 +132,7 @@ interface ContextProps {
   backupsSchedule: Linode.LinodeBackupSchedule;
   linodeInTransition: boolean;
   linodeLabel: string;
+  permissions: Linode.GrantLevel;
 }
 
 interface PreloadedProps {
@@ -145,13 +166,17 @@ type CombinedProps = PreloadedProps &
   WithStyles<ClassNames> &
   RouteComponentProps<{}> &
   ContextProps &
-  InjectedNotistackProps;
+  WithSnackbarProps;
 
 const evenize = (n: number): number => {
   if (n === 0) {
     return n;
   }
   return n % 2 === 0 ? n : n - 1;
+};
+
+const isReadOnly = (permissions: Linode.GrantLevel) => {
+  return permissions === 'read_only';
 };
 
 export const aggregateBackups = (
@@ -271,6 +296,8 @@ class LinodeBackup extends React.Component<CombinedProps, State> {
           variant: 'info'
         });
         resetEventsPolling();
+        // GA Event
+        sendBackupsEnabledEvent('From Backups tab');
       })
       .catch(errorResponse => {
         getAPIErrorOrDefault(errorResponse).forEach(
@@ -294,6 +321,8 @@ class LinodeBackup extends React.Component<CombinedProps, State> {
         // and enabling is still true:
         this.setState({ enabling: false });
         resetEventsPolling();
+        // GA Event
+        sendBackupsDisabledEvent();
       })
       .catch(errorResponse => {
         getAPIErrorOrDefault(
@@ -325,14 +354,15 @@ class LinodeBackup extends React.Component<CombinedProps, State> {
         resetEventsPolling();
       })
       .catch(errorResponse => {
-        getAPIErrorOrDefault(
-          errorResponse,
-          'There was an error taking a snapshot'
-        ).forEach((err: Linode.ApiFieldError) =>
-          enqueueSnackbar(err.reason, {
-            variant: 'error'
-          })
-        );
+        this.setState({
+          snapshotForm: {
+            ...this.state.snapshotForm,
+            errors: getAPIErrorOrDefault(
+              errorResponse,
+              'There was an error taking a snapshot'
+            )
+          }
+        });
       });
   };
 
@@ -385,20 +415,20 @@ class LinodeBackup extends React.Component<CombinedProps, State> {
     });
   };
 
-  handleSelectBackupWindow = (e: React.ChangeEvent<HTMLSelectElement>) => {
+  handleSelectBackupWindow = (e: Item) => {
     this.setState({
       settingsForm: {
         ...this.state.settingsForm,
-        window: e.target.value as Linode.Window
+        window: e.value as Linode.Window
       }
     });
   };
 
-  handleSelectBackupTime = (e: React.ChangeEvent<HTMLSelectElement>) => {
+  handleSelectBackupTime = (e: Item) => {
     this.setState({
       settingsForm: {
         ...this.state.settingsForm,
-        day: e.target.value as Linode.Day
+        day: e.value as Linode.Day
       }
     });
   };
@@ -419,7 +449,9 @@ class LinodeBackup extends React.Component<CombinedProps, State> {
     const { history, linodeID } = this.props;
     history.push(
       '/linodes/create' +
-        `?type=fromBackup&backupID=${backup.id}&linodeID=${linodeID}`
+        `?type=My%20Images&subtype=Backups&backupID=${
+          backup.id
+        }&linodeID=${linodeID}`
     );
   };
 
@@ -436,13 +468,15 @@ class LinodeBackup extends React.Component<CombinedProps, State> {
 
   Placeholder = (): JSX.Element | null => {
     const { enabling } = this.state;
+    const { permissions } = this.props;
+    const disabled = isReadOnly(permissions);
     const backupsMonthlyPrice = path<number>(
       ['types', 'response', 'addons', 'backups', 'price', 'monthly'],
       this.props
     );
 
     const backupPlaceholderText = backupsMonthlyPrice ? (
-      <React.Fragment>
+      <Typography>
         Three backup slots are executed and rotated automatically: a daily
         backup, a 2-7 day old backup, and 8-14 day old backup. To enable backups
         for just{' '}
@@ -450,22 +484,30 @@ class LinodeBackup extends React.Component<CombinedProps, State> {
           <Currency quantity={backupsMonthlyPrice} /> per month
         </strong>
         , click below.
-      </React.Fragment>
+      </Typography>
     ) : (
-      'Three backup slots are executed and rotated automatically: a daily backup, a 2-7 day old backup, and 8-14 day old backup. To enable backups just click below.'
+      <Typography>
+        Three backup slots are executed and rotated automatically: a daily
+        backup, a 2-7 day old backup, and 8-14 day old backup. To enable backups
+        just click below.
+      </Typography>
     );
 
     return (
-      <Placeholder
-        icon={VolumeIcon}
-        title="Backups"
-        copy={backupPlaceholderText}
-        buttonProps={{
-          onClick: () => this.enableBackups(),
-          children: 'Enable Backups',
-          loading: enabling
-        }}
-      />
+      <React.Fragment>
+        {disabled && <LinodePermissionsError />}
+        <Placeholder
+          icon={VolumeIcon}
+          title="Backups"
+          copy={backupPlaceholderText}
+          buttonProps={{
+            onClick: () => this.enableBackups(),
+            children: 'Enable Backups',
+            loading: enabling,
+            disabled
+          }}
+        />
+      </React.Fragment>
     );
   };
 
@@ -474,7 +516,8 @@ class LinodeBackup extends React.Component<CombinedProps, State> {
   }: {
     backups: Linode.LinodeBackup[];
   }): JSX.Element | null => {
-    const { classes } = this.props;
+    const { classes, permissions } = this.props;
+    const disabled = isReadOnly(permissions);
 
     return (
       <React.Fragment>
@@ -495,6 +538,7 @@ class LinodeBackup extends React.Component<CombinedProps, State> {
                 <BackupTableRow
                   key={idx}
                   backup={backup}
+                  disabled={disabled}
                   handleDeploy={this.handleDeploy}
                   handleRestore={this.handleRestore}
                 />
@@ -507,15 +551,16 @@ class LinodeBackup extends React.Component<CombinedProps, State> {
   };
 
   SnapshotForm = (): JSX.Element | null => {
-    const { classes, linodeInTransition } = this.props;
+    const { classes, linodeInTransition, permissions } = this.props;
     const { snapshotForm } = this.state;
-    const getErrorFor = getAPIErrorFor({ label: 'Label' }, snapshotForm.errors);
+    const hasErrorFor = getErrorMap(['label'], snapshotForm.errors);
+
+    const disabled = isReadOnly(permissions);
 
     return (
       <React.Fragment>
         <Paper className={classes.paper}>
           <Typography
-            role="header"
             variant="h2"
             className={classes.subTitle}
             data-qa-manual-heading
@@ -529,12 +574,22 @@ class LinodeBackup extends React.Component<CombinedProps, State> {
             it.
           </Typography>
           <FormControl className={classes.snapshotFormControl}>
+            {hasErrorFor.none && (
+              <Notice
+                spacingBottom={8}
+                className={classes.snapshotGeneralError}
+                error
+              >
+                {hasErrorFor.none}
+              </Notice>
+            )}
             <TextField
-              errorText={getErrorFor('label')}
+              errorText={hasErrorFor.label}
               label="Name Snapshot"
               value={snapshotForm.label || ''}
               onChange={this.handleSnapshotNameChange}
               data-qa-manual-name
+              className={classes.snapshotNameField}
             />
             <Tooltip title={linodeInTransition ? 'This Linode is busy' : ''}>
               <div>
@@ -542,15 +597,12 @@ class LinodeBackup extends React.Component<CombinedProps, State> {
                   type="primary"
                   onClick={this.takeSnapshot}
                   data-qa-snapshot-button
-                  disabled={linodeInTransition}
+                  disabled={linodeInTransition || disabled}
                 >
                   Take Snapshot
                 </Button>
               </div>
             </Tooltip>
-            {getErrorFor('none') && (
-              <FormHelperText error>{getErrorFor('none')}</FormHelperText>
-            )}
           </FormControl>
         </Paper>
       </React.Fragment>
@@ -558,7 +610,7 @@ class LinodeBackup extends React.Component<CombinedProps, State> {
   };
 
   SettingsForm = (): JSX.Element | null => {
-    const { classes } = this.props;
+    const { classes, permissions } = this.props;
     const { settingsForm } = this.state;
     const getErrorFor = getAPIErrorFor(
       {
@@ -575,11 +627,28 @@ class LinodeBackup extends React.Component<CombinedProps, State> {
       getErrorFor('backups.schedule.window') ||
       getErrorFor('backups.schedule.day');
 
+    const timeSelection = this.windows.map((window: Linode.Window[]) => {
+      const label = window[0];
+      return { label, value: window[1] };
+    });
+
+    const daySelection = this.days.map((day: string[]) => {
+      const label = day[0];
+      return { label, value: day[1] };
+    });
+
+    const defaultTimeSelection = timeSelection.find(eachOption => {
+      return eachOption.value === settingsForm.window;
+    });
+
+    const defaultDaySelection = daySelection.find(eachOption => {
+      return eachOption.value === settingsForm.day;
+    });
+
     return (
       <React.Fragment>
         <Paper className={classes.paper}>
           <Typography
-            role="header"
             variant="h2"
             className={classes.subTitle}
             data-qa-settings-heading
@@ -592,41 +661,41 @@ class LinodeBackup extends React.Component<CombinedProps, State> {
             selected day is when the backup is promoted to the weekly slot.
           </Typography>
           <FormControl className={classes.chooseTime}>
-            <InputLabel htmlFor="window">Time of Day</InputLabel>
             <Select
-              value={settingsForm.window}
+              options={timeSelection}
               onChange={this.handleSelectBackupWindow}
-              inputProps={{ name: 'window', id: 'window' }}
               data-qa-time-select
-            >
-              {this.windows.map((window: Linode.Window[]) => (
-                <MenuItem key={window[0]} value={window[1]}>
-                  {window[0]}
-                </MenuItem>
-              ))}
-            </Select>
+              label="Time of Day"
+              placeholder="Choose a time"
+              isClearable={false}
+              defaultValue={defaultTimeSelection}
+              name="Time of Day"
+              noMarginTop
+            />
             <FormHelperText>
               Windows displayed in {this.props.timezone}
             </FormHelperText>
           </FormControl>
 
-          <FormControl>
-            <InputLabel htmlFor="day">Day of Week</InputLabel>
+          <FormControl className={classes.chooseDay}>
             <Select
-              value={settingsForm.day}
+              options={daySelection}
+              defaultValue={defaultDaySelection}
               onChange={this.handleSelectBackupTime}
-              inputProps={{ name: 'day', id: 'day' }}
               data-qa-weekday-select
-            >
-              {this.days.map((day: string[]) => (
-                <MenuItem key={day[0]} value={day[1]}>
-                  {day[0]}
-                </MenuItem>
-              ))}
-            </Select>
+              label="Day of Week"
+              placeholder="Choose a day"
+              isClearable={false}
+              noMarginTop
+            />
           </FormControl>
           <ActionsPanel className={classes.scheduleAction}>
-            <Button type="primary" onClick={this.saveSettings} data-qa-schedule>
+            <Button
+              type="primary"
+              onClick={this.saveSettings}
+              disabled={isReadOnly(permissions)}
+              data-qa-schedule
+            >
               Save Schedule
             </Button>
           </ActionsPanel>
@@ -637,12 +706,15 @@ class LinodeBackup extends React.Component<CombinedProps, State> {
   };
 
   Management = (): JSX.Element | null => {
-    const { classes, linodeID, linodeRegion } = this.props;
+    const { classes, linodeID, linodeRegion, permissions } = this.props;
+    const disabled = isReadOnly(permissions);
+
     const { backups: backupsResponse } = this.state;
     const backups = aggregateBackups(backupsResponse);
 
     return (
       <React.Fragment>
+        {disabled && <LinodePermissionsError />}
         <Typography
           role="header"
           variant="h2"
@@ -668,6 +740,7 @@ class LinodeBackup extends React.Component<CombinedProps, State> {
           className={classes.cancelButton}
           onClick={this.handleOpenBackupsAlert}
           data-qa-cancel
+          disabled={disabled}
         >
           Cancel Backups
         </Button>
@@ -724,6 +797,13 @@ class LinodeBackup extends React.Component<CombinedProps, State> {
   render() {
     const { backupsEnabled, linodeLabel } = this.props;
 
+    if (this.props.backups.error) {
+      /** @todo remove promise loader and source backups from Redux */
+      return (
+        <ErrorState errorText="There was an issue retrieving your backups." />
+      );
+    }
+
     return (
       <React.Fragment>
         <DocumentTitleSegment segment={`${linodeLabel} - Backups`} />
@@ -750,7 +830,10 @@ interface StateProps {
   timezone: string;
 }
 
-const mapStateToProps: MapState<StateProps, {}> = state => ({
+const mapStateToProps: MapState<StateProps, CombinedProps> = (
+  state,
+  ownProps
+) => ({
   timezone: pathOr('GMT', ['data', 'timezone'], state.__resources.profile)
 });
 
@@ -763,7 +846,8 @@ const linodeContext = withLinodeDetailContext(({ linode }) => ({
   linodeInTransition: isLinodeInTransition(linode.status),
   linodeLabel: linode.label,
   linodeRegion: linode.region,
-  linodeType: linode.type
+  linodeType: linode.type,
+  permissions: linode._permissions
 }));
 
 export default compose<CombinedProps, {}>(

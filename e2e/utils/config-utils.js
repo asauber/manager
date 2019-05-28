@@ -1,8 +1,5 @@
-const moment = require('moment');
-const { existsSync, statSync, writeFileSync, readFileSync } = require('fs');
-const { constants } = require('../constants');
-const { deleteAll } = require('../setup/setup');
 
+<<<<<<< HEAD
 /*
 * Get localStorage after landing on homepage
 * and write them out to a file for use in other tests
@@ -128,48 +125,24 @@ exports.checkoutCreds = (credFilePath, specFile) => {
             writeFileSync(credFilePath, JSON.stringify(credCollection));
             return cred;
         }
+=======
+module.exports.readToken = () => {
+    let token = null;
+    browser.call(() => {
+        return browser.credStore.readToken(browser.options.testUser).then((t) => token = t);
+>>>>>>> aa9dec28f5b8cc095e1da60f974a7dfd064434c6
     });
+    console.log(`token is ${token}`);
+    return token;
 }
 
-exports.checkInCreds = (credFilePath, specFile) => {
-    let credCollection = JSON.parse(readFileSync(credFilePath));
-    return credCollection.find((cred, i) => {
-        if (cred.spec === specFile) {
-            credCollection[i].inUse = false;
-            credCollection[i].spec = '';
-            // credCollection[i].token = '';
-            writeFileSync(credFilePath, JSON.stringify(credCollection));
-            return cred;
-        }
-        return;
+module.exports.getToken = (username) => {
+    let token = null;
+    browser.call(() => {
+        return browser.credStore.readToken(username).then((t) => token = t);
     });
-}
-
-exports.generateCreds = (credFilePath, config, userCount) => {
-    const credCollection = [];
-
-    const setCredCollection = (userKey, userIndex) => {
-        const setEnvToken = process.env[`MANAGER_OAUTH${userIndex}`];
-        const token = !!setEnvToken ? setEnvToken : '';
-        const tokenFlag = !!token
-        credCollection.push({username: process.env[`${userKey}${userIndex}`], password: process.env[`MANAGER_PASS${userIndex}`], inUse: false, token: token, spec: '', isPresetToken: tokenFlag});
-    }
-
-    setCredCollection('MANAGER_USER', '');
-    if ( userCount > 1 ) {
-        for( i = 2; i <= userCount; i++ ){
-            setCredCollection('MANAGER_USER', `_${i}`);
-        }
-    }
-
-    writeFileSync(credFilePath, JSON.stringify(credCollection));
-}
-
-exports.cleanupAccounts = (credFilePath) => {
-    const credCollection = JSON.parse(readFileSync(credFilePath));
-    credCollection.forEach(cred => {
-        return deleteAll(cred.token).then(() => {});
-    });
+    console.log(`token is ${token}`);
+    return token;
 }
 
 /*

@@ -1,7 +1,8 @@
-import { InjectedNotistackProps, withSnackbar } from 'notistack';
+import { withSnackbar, WithSnackbarProps } from 'notistack';
+import { pathOr } from 'ramda';
 import * as React from 'react';
-import { connect } from 'react-redux';
-import { RouteComponentProps, withRouter } from 'react-router-dom';
+import { connect, MapStateToProps } from 'react-redux';
+import { Link, RouteComponentProps, withRouter } from 'react-router-dom';
 import { compose } from 'recompose';
 import DomainIcon from 'src/assets/addnewmenu/domain.svg';
 import ActionsPanel from 'src/components/ActionsPanel';
@@ -30,19 +31,27 @@ import localStorageContainer from 'src/containers/localStorage.container';
 import { Domains } from 'src/documentation';
 import ListDomains from 'src/features/Domains/ListDomains';
 import ListGroupedDomains from 'src/features/Domains/ListGroupedDomains';
-import { openForCloning, openForCreating } from 'src/store/domainDrawer';
+import {
+  openForCloning,
+  openForCreating,
+  openForEditing
+} from 'src/store/domainDrawer';
 import {
   DomainActionsProps,
   withDomainActions
 } from 'src/store/domains/domains.container';
-import { sendEvent } from 'src/utilities/analytics';
+import { sendGroupByTagEnabledEvent } from 'src/utilities/ga';
 import DomainZoneImportDrawer from './DomainZoneImportDrawer';
+
+import Notice from 'src/components/Notice';
+import { ApplicationState } from 'src/store';
 
 type ClassNames =
   | 'root'
   | 'titleWrapper'
   | 'title'
   | 'domain'
+  | 'dnsWarning'
   | 'tagWrapper'
   | 'tagGroup';
 
@@ -56,6 +65,11 @@ const styles: StyleRulesCallback<ClassNames> = theme => ({
   },
   domain: {
     width: '60%'
+  },
+  dnsWarning: {
+    '& h3:first-child': {
+      marginBottom: theme.spacing.unit
+    }
   },
   tagWrapper: {
     marginTop: theme.spacing.unit / 2,
@@ -81,24 +95,25 @@ interface State {
     open: boolean;
     mode: 'clone' | 'create';
     domain?: string;
-    cloneID?: number;
+    id?: number;
   };
   removeDialog: {
     open: boolean;
     domain?: string;
-    domainID?: number;
+    domainId?: number;
   };
 }
 
-type CombinedProps = WithDomainsProps &
+export type CombinedProps = WithDomainsProps &
   DomainActionsProps &
   LocalStorageProps &
   WithStyles<ClassNames> &
   RouteComponentProps<{}> &
+  StateProps &
   DispatchProps &
-  InjectedNotistackProps;
+  WithSnackbarProps;
 
-class DomainsLanding extends React.Component<CombinedProps, State> {
+export class DomainsLanding extends React.Component<CombinedProps, State> {
   static eventCategory = `domains landing`;
   state: State = {
     importDrawer: {
@@ -158,13 +173,12 @@ class DomainsLanding extends React.Component<CombinedProps, State> {
 
   removeDomain = () => {
     const {
-      removeDialog: { domainID }
+      removeDialog: { domainId }
     } = this.state;
     const { enqueueSnackbar, domainActions } = this.props;
-    if (domainID) {
-      // @todo: Replace all "domainID" with "domainId"
+    if (domainId) {
       domainActions
-        .deleteDomain({ domainId: domainID })
+        .deleteDomain({ domainId })
         .then(() => {
           this.closeRemoveDialog();
         })
@@ -183,9 +197,9 @@ class DomainsLanding extends React.Component<CombinedProps, State> {
     }
   };
 
-  openRemoveDialog = (domain: string, domainID: number) => {
+  openRemoveDialog = (domain: string, domainId: number) => {
     this.setState({
-      removeDialog: { open: true, domain, domainID }
+      removeDialog: { open: true, domain, domainId }
     });
   };
 
@@ -200,6 +214,8 @@ class DomainsLanding extends React.Component<CombinedProps, State> {
     const { classes } = this.props;
     const { domainsError, domainsData, domainsLoading } = this.props;
 
+    const domainsLength = domainsData.length;
+
     if (domainsLoading) {
       return <RenderLoading />;
     }
@@ -208,7 +224,7 @@ class DomainsLanding extends React.Component<CombinedProps, State> {
       return <RenderError />;
     }
 
-    if (domainsData.length === 0) {
+    if (domainsLength === 0) {
       return <RenderEmpty onClick={this.props.openForCreating} />;
     }
 
@@ -222,12 +238,7 @@ class DomainsLanding extends React.Component<CombinedProps, State> {
           style={{ paddingBottom: 0 }}
         >
           <Grid item className={classes.titleWrapper}>
-            <Typography
-              role="header"
-              variant="h1"
-              data-qa-title
-              className={classes.title}
-            >
+            <Typography variant="h1" data-qa-title className={classes.title}>
               Domains
             </Typography>
           </Grid>
@@ -263,6 +274,18 @@ class DomainsLanding extends React.Component<CombinedProps, State> {
             </Grid>
           </Grid>
         </Grid>
+        {this.props.howManyLinodesOnAccount === 0 && domainsLength > 0 && (
+          <Notice warning important className={classes.dnsWarning}>
+            <Typography variant="h3">
+              Your DNS zones are not being served.
+            </Typography>
+            <Typography>
+              Your domains will not be served by Linode's nameservers unless you
+              have at least one active Linode on your account.
+              <Link to="/linodes/create"> You can create one here.</Link>
+            </Typography>
+          </Notice>
+        )}
         <Grid item xs={12}>
           {/* Duplication starts here. How can we refactor this? */}
           <OrderBy data={domainsData} order={'asc'} orderBy={'domain'}>
@@ -273,6 +296,7 @@ class DomainsLanding extends React.Component<CombinedProps, State> {
                 handleOrderChange,
                 data: orderedData,
                 onClone: this.props.openForCloning,
+                onEdit: this.props.openForEditing,
                 onRemove: this.openRemoveDialog
               };
 
@@ -312,6 +336,27 @@ const RenderError: React.StatelessComponent<{}> = () => {
   );
 };
 
+const EmptyCopy = () => (
+  <>
+    <Typography variant="subtitle1">
+      Create a Domain, add Domain records, import zones and domains.
+    </Typography>
+    <Typography variant="subtitle1">
+      <a
+        href="https://www.linode.com/docs/platform/manager/dns-manager-new-manager/"
+        target="_blank"
+        className="h-u"
+      >
+        Find out how to setup your domains associated with your Linodes
+      </a>
+      &nbsp;or&nbsp;
+      <a href="https://www.linode.com/docs/" target="_blank" className="h-u">
+        visit our guides and tutorials.
+      </a>
+    </Typography>
+  </>
+);
+
 const RenderEmpty: React.StatelessComponent<{
   onClick: () => void;
 }> = props => {
@@ -319,8 +364,8 @@ const RenderEmpty: React.StatelessComponent<{
     <React.Fragment>
       <DocumentTitleSegment segment="Domains" />
       <Placeholder
-        title="Add a Domain"
-        copy="Adding a new domain is easy. Click below to add a domain."
+        title="Manage your Domains"
+        copy={<EmptyCopy />}
         icon={DomainIcon}
         buttonProps={{
           onClick: props.onClick,
@@ -334,7 +379,8 @@ const RenderEmpty: React.StatelessComponent<{
 const styled = withStyles(styles);
 
 interface DispatchProps {
-  openForCloning: (domain: string, cloneId: number) => void;
+  openForCloning: (domain: string, id: number) => void;
+  openForEditing: (domain: string, id: number) => void;
   openForCreating: () => void;
 }
 
@@ -346,7 +392,6 @@ interface LocalStorageState {
 
 interface LocalStorageUpdater {
   toggleGroupByTag: (checked: boolean) => Partial<LocalStorageState>;
-  [key: string]: (...args: any[]) => Partial<LocalStorageState>;
 }
 
 const withLocalStorage = localStorageContainer<
@@ -363,11 +408,7 @@ const withLocalStorage = localStorageContainer<
     toggleGroupByTag: state => (checked: boolean) => {
       storage.groupDomainsByTag.set(checked ? 'true' : 'false');
 
-      sendEvent({
-        category: DomainsLanding.eventCategory,
-        action: 'group by tag',
-        label: String(checked)
-      });
+      sendGroupByTagEnabledEvent(DomainsLanding.eventCategory, checked);
 
       return {
         ...state,
@@ -377,9 +418,25 @@ const withLocalStorage = localStorageContainer<
   })
 );
 
+interface StateProps {
+  howManyLinodesOnAccount: number;
+}
+
+const mapStateToProps: MapStateToProps<
+  StateProps,
+  {},
+  ApplicationState
+> = state => ({
+  howManyLinodesOnAccount: pathOr(
+    [],
+    ['__resources', 'linodes', 'results'],
+    state
+  ).length
+});
+
 export const connected = connect(
-  undefined,
-  { openForCreating, openForCloning }
+  mapStateToProps,
+  { openForCreating, openForCloning, openForEditing }
 );
 
 export default compose<CombinedProps, {}>(

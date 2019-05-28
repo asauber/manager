@@ -1,12 +1,17 @@
 import { Dispatch } from 'redux';
 import { ApplicationState } from 'src/store';
+import { requestLinodeForStore } from 'src/store/linodes/linode.requests';
 import { EventHandler } from 'src/store/types';
 import { requestNotifications } from '../notification/notification.requests';
+<<<<<<< HEAD
 import {
   deleteLinode,
   requestLinodeForStore,
   updateLinode
 } from './linodes.actions';
+=======
+import { deleteLinode, updateLinode } from './linodes.actions';
+>>>>>>> aa9dec28f5b8cc095e1da60f974a7dfd064434c6
 
 const linodeEventsHandler: EventHandler = (event, dispatch, getState) => {
   const { action, entity, status } = event;
@@ -23,6 +28,10 @@ const linodeEventsHandler: EventHandler = (event, dispatch, getState) => {
     case 'linode_snapshot':
     case 'linode_addip':
     case 'linode_boot':
+<<<<<<< HEAD
+=======
+    case 'backups_restore':
+>>>>>>> aa9dec28f5b8cc095e1da60f974a7dfd064434c6
     case 'backups_enable':
     case 'backups_cancel':
     case 'disk_imagize':
@@ -141,12 +150,6 @@ const handleLinodeCreation = (
   id: number,
   state: ApplicationState
 ) => {
-  const found = state.__resources.linodes.results.find(i => i === id);
-
-  if (found) {
-    return;
-  }
-
   switch (status) {
     case 'failed':
     case 'finished':

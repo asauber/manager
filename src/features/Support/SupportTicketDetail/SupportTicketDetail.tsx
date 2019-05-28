@@ -24,12 +24,13 @@ import Grid from 'src/components/Grid';
 import Notice from 'src/components/Notice';
 import { getTicket, getTicketReplies } from 'src/services/support';
 import { MapState } from 'src/store/types';
+import { getAPIErrorOrDefault } from 'src/utilities/errorUtils';
 import formatDate from 'src/utilities/formatDate';
 import { getGravatarUrlFromHash } from 'src/utilities/gravatar';
 import ExpandableTicketPanel from '../ExpandableTicketPanel';
 import TicketAttachmentList from '../TicketAttachmentList';
 import AttachmentError from './AttachmentError';
-import TicketReply from './TicketReply';
+import Reply from './TabbedReply';
 
 type ClassNames =
   | 'root'
@@ -135,10 +136,10 @@ export class SupportTicketDetail extends React.Component<CombinedProps, State> {
 
   componentDidMount() {
     this.mounted = true;
-    const { history } = this.props;
+    const { history, location } = this.props;
     this.loadTicketAndReplies();
     // Clear any state that was passed from React Router so errors don't persist after reload.
-    history.push({ state: {} });
+    history.replace(location.pathname, {});
   }
 
   componentDidUpdate(prevProps: CombinedProps, prevState: State) {
@@ -218,10 +219,9 @@ export class SupportTicketDetail extends React.Component<CombinedProps, State> {
       this.loadReplies(),
       this.handleJoinedPromise
     ).catch(err => {
-      const error = [{ reason: 'Ticket not found.' }];
       this.setState({
         loading: false,
-        errors: pathOr(error, ['response', 'data', 'errors'], err)
+        errors: getAPIErrorOrDefault(err, 'Ticket not found.')
       });
     });
   };
@@ -343,12 +343,9 @@ export class SupportTicketDetail extends React.Component<CombinedProps, State> {
           <Grid item className={classes.titleWrapper}>
             <Breadcrumb
               linkTo={{
-                pathname: '/support/tickets',
-                // If the ticket is "open" or "new", the "Open Tickets" tab
-                // should be active on when we go back to SupportTicketsLanding
-                state: {
-                  openFromRedirect: ['open', 'new'].includes(ticket.status)
-                }
+                pathname: `/support/tickets`,
+                // If we're viewing a `Closed` ticket, the Breadcrumb link should take us to `Closed` tickets.
+                search: `type=${ticket.status === 'closed' ? 'closed' : 'open'}`
               }}
               linkText="Support Tickets"
               labelTitle={`#${ticket.id}: ${ticket.summary}`}
@@ -390,13 +387,7 @@ export class SupportTicketDetail extends React.Component<CombinedProps, State> {
           <Notice success text={'Ticket has been closed.'} />
         )}
 
-        <Grid
-          container
-          direction="column"
-          justify="center"
-          alignItems="center"
-          className={classes.listParent}
-        >
+        <Grid container className={classes.listParent}>
           {/* If the ticket isn't blank, display it, followed by replies (if any). */}
           {ticket.description && (
             <ExpandableTicketPanel
@@ -409,7 +400,7 @@ export class SupportTicketDetail extends React.Component<CombinedProps, State> {
           <TicketAttachmentList attachments={ticket.attachments} />
           {/* If the ticket is open, allow users to reply to it. */}
           {['open', 'new'].includes(ticket.status) && (
-            <TicketReply
+            <Reply
               ticketId={ticket.id}
               closable={ticket.closable}
               onSuccess={this.onCreateReplySuccess}

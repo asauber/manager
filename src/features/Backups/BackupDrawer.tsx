@@ -1,4 +1,4 @@
-import { InjectedNotistackProps, withSnackbar } from 'notistack';
+import { withSnackbar, WithSnackbarProps } from 'notistack';
 import { isEmpty, path, pathOr } from 'ramda';
 import * as React from 'react';
 import { connect, MapDispatchToProps, MapStateToProps } from 'react-redux';
@@ -76,7 +76,7 @@ type CombinedProps = DispatchProps &
   StateProps &
   WithTypesProps &
   WithStyles<ClassNames> &
-  InjectedNotistackProps;
+  WithSnackbarProps;
 
 const getFailureNotificationText = (
   success: number,
@@ -162,7 +162,7 @@ export class BackupDrawer extends React.Component<CombinedProps, {}> {
             </Typography>
           </Grid>
           {enableErrors && !isEmpty(enableErrors) && (
-            <Grid item>
+            <Grid item data-testid={'result-notice'}>
               <Notice error spacingBottom={0}>
                 {getFailureNotificationText(updatedCount, enableErrors.length)}
               </Notice>
@@ -194,6 +194,7 @@ export class BackupDrawer extends React.Component<CombinedProps, {}> {
                 loading={loading || enabling || enrolling}
                 type="primary"
                 data-qa-submit
+                data-testid={'submit'}
               >
                 Confirm
               </Button>
@@ -202,6 +203,7 @@ export class BackupDrawer extends React.Component<CombinedProps, {}> {
                 type="secondary"
                 className="cancel"
                 data-qa-cancel
+                data-testid={'cancel'}
               >
                 Cancel
               </Button>

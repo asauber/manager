@@ -1,5 +1,6 @@
-import { path } from 'ramda';
+import { pathOr } from 'ramda';
 import * as React from 'react';
+import { connect } from 'react-redux';
 import { compose } from 'recompose';
 import ActionsPanel from 'src/components/ActionsPanel';
 import Button from 'src/components/Button';
@@ -12,14 +13,18 @@ import {
   withStyles
 } from 'src/components/core/styles';
 import Drawer from 'src/components/Drawer';
-import MenuItem from 'src/components/MenuItem';
-import Select from 'src/components/Select';
+import Select, { Item } from 'src/components/EnhancedSelect/Select';
+import Notice from 'src/components/Notice';
 import withVolumesRequests, {
   VolumesRequests
 } from 'src/containers/volumesRequests.container';
+import withLinodes from 'src/containers/withLinodes.container';
 import { resetEventsPolling } from 'src/events';
 import LinodeSelect from 'src/features/linodes/LinodeSelect';
-import { getLinodeConfigs, getLinodes } from 'src/services/linodes';
+import { isRestrictedUser } from 'src/features/Profile/permissionsHelpers';
+import { getLinodeConfigs } from 'src/services/linodes';
+import { MapState } from 'src/store/types';
+import { getAPIErrorOrDefault } from 'src/utilities/errorUtils';
 import getAPIErrorsFor from 'src/utilities/getAPIErrorFor';
 import scrollErrorIntoView from 'src/utilities/scrollErrorIntoView';
 
@@ -39,20 +44,26 @@ interface Props {
 }
 
 interface State {
-  linodes: string[][];
   configs: string[][];
-  selectedLinode?: string;
+  selectedLinode: number | null;
   selectedConfig?: string;
   errors?: Linode.ApiFieldError[];
 }
 
-type CombinedProps = Props & VolumesRequests & WithStyles<ClassNames>;
+interface LinodesProps {
+  linodesError?: boolean;
+}
+
+type CombinedProps = Props &
+  VolumesRequests &
+  WithStyles<ClassNames> &
+  LinodesProps &
+  StateProps;
 
 class VolumeAttachmentDrawer extends React.Component<CombinedProps, State> {
   defaultState = {
-    linodes: [],
     configs: [],
-    selectedLinode: 'none',
+    selectedLinode: null,
     selectedConfig: 'none',
     errors: []
   };
@@ -61,19 +72,6 @@ class VolumeAttachmentDrawer extends React.Component<CombinedProps, State> {
 
   reset = () => {
     this.setState({ ...this.defaultState });
-  };
-
-  updateLinodes = (linodeRegion: string) => {
-    /*
-     * @todo: We're only getting page 1 here, what if the account has over 100
-     * Linodes?
-     */
-    getLinodes({ page: 1 }, { region: linodeRegion }).then(response => {
-      const linodeChoices = response.data.map(linode => {
-        return [`${linode.id}`, linode.label];
-      });
-      this.setState({ linodes: linodeChoices });
-    });
   };
 
   updateConfigs(linodeID: number) {
@@ -98,15 +96,15 @@ class VolumeAttachmentDrawer extends React.Component<CombinedProps, State> {
       });
   }
 
-  changeSelectedLinode = (e: React.ChangeEvent<HTMLInputElement>) => {
-    this.setState({ selectedLinode: e.target.value });
-    if (e.target.value) {
-      this.updateConfigs(+e.target.value);
+  changeSelectedLinode = (linodeId: number | null) => {
+    this.setState({ selectedLinode: linodeId });
+    if (linodeId) {
+      this.updateConfigs(linodeId);
     }
   };
 
-  changeSelectedConfig = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    this.setState({ selectedConfig: e.target.value });
+  changeSelectedConfig = (e: Item<string>) => {
+    this.setState({ selectedConfig: e.value });
   };
 
   handleClose = () => {
@@ -115,19 +113,13 @@ class VolumeAttachmentDrawer extends React.Component<CombinedProps, State> {
   };
 
   componentWillReceiveProps(nextProps: CombinedProps) {
-    if (
-      nextProps.linodeRegion &&
-      this.props.linodeRegion !== nextProps.linodeRegion
-    ) {
-      this.updateLinodes(nextProps.linodeRegion);
-    }
     this.setState({ configs: [] });
   }
 
   attachToLinode = () => {
     const { volumeId, attachVolume } = this.props;
     const { selectedLinode, selectedConfig } = this.state;
-    if (!selectedLinode || selectedLinode === 'none') {
+    if (!selectedLinode) {
       this.setState(
         {
           errors: [
@@ -147,17 +139,14 @@ class VolumeAttachmentDrawer extends React.Component<CombinedProps, State> {
       linode_id: Number(selectedLinode),
       config_id: Number(selectedConfig) || undefined
     })
-      .then(response => {
+      .then(_ => {
         resetEventsPolling();
         this.handleClose();
       })
       .catch(error => {
-        this.setState(
-          { errors: path(['response', 'data', 'errors'], error) },
-          () => {
-            scrollErrorIntoView();
-          }
-        );
+        this.setState({ errors: getAPIErrorOrDefault(error) }, () => {
+          scrollErrorIntoView();
+        });
       });
   };
 
@@ -167,19 +156,29 @@ class VolumeAttachmentDrawer extends React.Component<CombinedProps, State> {
   };
 
   render() {
-    const { open, volumeLabel, disabled } = this.props;
     const {
-      linodes,
-      configs,
-      selectedLinode,
-      selectedConfig,
-      errors
-    } = this.state;
+      open,
+      volumeLabel,
+      disabled,
+      linodesError,
+      linodeRegion,
+      readOnly
+    } = this.props;
+    const { configs, selectedLinode, selectedConfig, errors } = this.state;
 
     const hasErrorFor = getAPIErrorsFor(this.errorResources, errors);
     const linodeError = hasErrorFor('linode_id');
     const configError = hasErrorFor('config_id');
     const generalError = hasErrorFor('none');
+
+    const configList =
+      configs &&
+      configs.map(el => {
+        return {
+          label: el[1],
+          value: el[0]
+        };
+      });
 
     return (
       <Drawer
@@ -187,14 +186,26 @@ class VolumeAttachmentDrawer extends React.Component<CombinedProps, State> {
         onClose={this.handleClose}
         title={`Attach Volume ${volumeLabel}`}
       >
+        {readOnly && (
+          <Notice
+            text={`You don't have permissions to edit ${volumeLabel}. Please contact an account administrator for details.`}
+            error={true}
+            important
+          />
+        )}
         <LinodeSelect
-          linodes={linodes}
           selectedLinode={selectedLinode}
+          region={linodeRegion}
           handleChange={this.changeSelectedLinode}
           linodeError={linodeError}
           generalError={generalError}
-          disabled={disabled}
+          disabled={disabled || readOnly}
         />
+        {!(linodeError || generalError || linodesError) && (
+          <FormHelperText>
+            Only Linodes in this Volume's region are displayed.
+          </FormHelperText>
+        )}
 
         {/* Config Selection */}
         {configs.length > 1 && (
@@ -204,26 +215,21 @@ class VolumeAttachmentDrawer extends React.Component<CombinedProps, State> {
               disableAnimation
               shrink={true}
               error={Boolean(configError)}
-              disabled={disabled}
+              disabled={disabled || readOnly}
             >
               Config
             </InputLabel>
             <Select
-              value={selectedConfig || ''}
+              options={configList}
+              defaultValue={selectedConfig || ''}
               onChange={this.changeSelectedConfig}
-              inputProps={{ name: 'config', id: 'config' }}
-              error={Boolean(configError)}
-              disabled={disabled}
-            >
-              {configs &&
-                configs.map(el => {
-                  return (
-                    <MenuItem key={el[0]} value={el[0]}>
-                      {el[1]}
-                    </MenuItem>
-                  );
-                })}
-            </Select>
+              name="config"
+              id="config"
+              errorText={linodeError}
+              disabled={disabled || readOnly}
+              label="Config"
+              isClearable={false}
+            />
             {Boolean(configError) && (
               <FormHelperText error>{configError}</FormHelperText>
             )}
@@ -232,7 +238,7 @@ class VolumeAttachmentDrawer extends React.Component<CombinedProps, State> {
 
         <ActionsPanel>
           <Button
-            disabled={disabled}
+            disabled={disabled || readOnly}
             type="primary"
             onClick={this.attachToLinode}
             data-qa-submit
@@ -248,11 +254,40 @@ class VolumeAttachmentDrawer extends React.Component<CombinedProps, State> {
   }
 }
 
+interface StateProps {
+  readOnly?: boolean;
+}
+
+const mapStateToProps: MapState<StateProps, Props> = (state, ownProps) => {
+  const volumesPermissions = pathOr(
+    [],
+    ['__resources', 'profile', 'data', 'grants', 'volume'],
+    state
+  );
+  const volumePermissions = volumesPermissions.find(
+    (v: Linode.Grant) => v.id === ownProps.volumeId
+  );
+
+  return {
+    readOnly:
+      isRestrictedUser(state) &&
+      volumePermissions &&
+      volumePermissions.permissions === 'read_only'
+  };
+};
+
+const connected = connect(mapStateToProps);
+
 const styled = withStyles(styles);
 
 const enhanced = compose<CombinedProps, Props>(
   styled,
-  withVolumesRequests
+  withVolumesRequests,
+  withLinodes((ownProps, linodesData, linodesLoading, linodesError) => ({
+    ...ownProps,
+    linodesError
+  })),
+  connected
 );
 
 export default enhanced(VolumeAttachmentDrawer);

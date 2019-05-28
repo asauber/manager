@@ -94,6 +94,7 @@ class SearchBar extends React.Component<CombinedProps, State> {
   };
 
   onClose = () => {
+    document.body.classList.remove('searchOverlay');
     this.setState({
       searchActive: false,
       menuOpen: false
@@ -101,6 +102,7 @@ class SearchBar extends React.Component<CombinedProps, State> {
   };
 
   onOpen = () => {
+    document.body.classList.add('searchOverlay');
     this.setState({
       searchActive: true,
       menuOpen: true
@@ -122,6 +124,20 @@ class SearchBar extends React.Component<CombinedProps, State> {
       return;
     }
     history.push(item.data.path);
+  };
+
+  onKeyDown = (e: any) => {
+    const { searchText } = this.state;
+    if (e.keyCode === 13 && searchText !== '') {
+      const { combinedResults, history } = this.props;
+      if (!combinedResults || combinedResults.length < 1) {
+        history.push({
+          pathname: `/search`,
+          search: `?query=${encodeURIComponent(searchText)}`
+        });
+        this.onClose();
+      }
+    }
   };
 
   guidanceText = () => {
@@ -170,6 +186,7 @@ class SearchBar extends React.Component<CombinedProps, State> {
             options={finalOptions}
             onChange={this.onSelect}
             onInputChange={this.handleSearchChange}
+            onKeyDown={this.onKeyDown}
             placeholder={
               searchActive
                 ? 'Search'

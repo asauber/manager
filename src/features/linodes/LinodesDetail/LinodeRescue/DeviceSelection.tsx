@@ -1,14 +1,12 @@
-import { defaultTo } from 'ramda';
+import { defaultTo, flatten } from 'ramda';
 import * as React from 'react';
 import FormControl from 'src/components/core/FormControl';
-import InputLabel from 'src/components/core/InputLabel';
 import {
   StyleRulesCallback,
   withStyles,
   WithStyles
 } from 'src/components/core/styles';
-import MenuItem from 'src/components/MenuItem';
-import Select from 'src/components/Select';
+import Select, { GroupType, Item } from 'src/components/EnhancedSelect/Select';
 import { titlecase } from 'src/features/linodes/presentation';
 
 type ClassNames = 'root';
@@ -35,76 +33,92 @@ interface Props {
   counter?: number;
   slots: string[];
   rescue?: boolean;
+  disabled?: boolean;
 }
 
 type CombinedProps = Props & WithStyles<ClassNames>;
 
+export const getSelectedOption = (
+  selectedValue: string,
+  options: GroupType<string>[]
+) => {
+  if (!selectedValue) {
+    return null;
+  }
+  // Ramda's flatten doesn't seem able to handle the typing issues here, but this returns an array of Item<string>.
+  const optionsList = (flatten(
+    options.map(group => group.options)
+  ) as unknown) as Item<string>[];
+  return optionsList.find(option => option.value === selectedValue) || null;
+};
+
 const DeviceSelection: React.StatelessComponent<CombinedProps> = props => {
-  const { devices, onChange, getSelected, slots, rescue, classes } = props;
+  const {
+    devices,
+    onChange,
+    getSelected,
+    slots,
+    rescue,
+    classes,
+    disabled
+  } = props;
 
   const counter = defaultTo(0, props.counter);
 
   return (
     <React.Fragment>
       {slots.map((slot, idx) => {
+        const deviceList = Object.entries(devices).map(([type, items]) => {
+          const device = titlecase(type);
+          return {
+            label: device,
+            value: type,
+            options: (items as any[]).map(({ _id, label }) => {
+              return { label, value: _id };
+            })
+          };
+        });
+
+        deviceList.unshift({
+          value: '',
+          label: '',
+          options: [{ value: null, label: 'None' }]
+        });
+
+        const selectedDevice = getSelectedOption(getSelected(slot), deviceList);
+
         return counter < idx ? null : (
           <FormControl
-            updateFor={[getSelected(slot), classes]}
+            updateFor={[selectedDevice, deviceList, classes]}
             key={slot}
             fullWidth
           >
-            <InputLabel
-              htmlFor={`rescueDevice_${slot}`}
-              disableAnimation
-              shrink={true}
-            >
-              /dev/{slot}
-            </InputLabel>
             <Select
-              fullWidth
-              value={getSelected(slot) || 'none'}
-              onChange={e => onChange(slot, e.target.value)}
-              inputProps={{
-                name: `rescueDevice_${slot}`,
-                id: `rescueDevice_${slot}`
-              }}
-            >
-              <MenuItem value="none">None</MenuItem>
-              {Object.entries(devices).map(([type, items]) => [
-                <MenuItem
-                  className="selectHeader"
-                  disabled
-                  key={type}
-                  data-qa-type={titlecase(type)}
-                >
-                  {titlecase(type)}
-                </MenuItem>,
-                ...(items as any[]).map(({ _id, label }) => (
-                  <MenuItem key={_id} value={_id} data-qa-option={label}>
-                    {label}
-                  </MenuItem>
-                ))
-              ])}
-            </Select>
+              options={deviceList}
+              value={selectedDevice}
+              onChange={(e: Item<string>) => onChange(slot, e.value)}
+              disabled={disabled}
+              placeholder={'None'}
+              isClearable={false}
+              label={`/dev/${slot}`}
+              noMarginTop
+            />
           </FormControl>
         );
       })}
       {rescue && (
         <FormControl fullWidth>
-          <InputLabel
-            htmlFor={`rescueDevice_sdh`}
-            disableAnimation
-            shrink={true}
-          >
-            /dev/sdh
-          </InputLabel>
           <Select
             disabled
-            value={'finnix'}
-            inputProps={{ name: `rescueDevice_sdh`, id: `rescueDevice_sdh` }}
-          >
-            <MenuItem value="finnix">Finnix Media</MenuItem>
-          </Select>
+            onChange={() => onChange}
+            options={[]}
+            defaultValue={'finnix'}
+            name="rescueDevice_sdh"
+            id="rescueDevice_sdh"
+            label="/dev/sdh"
+            placeholder="Finnix Media"
+            noMarginTop
+          />
         </FormControl>
       )}
     </React.Fragment>

@@ -5,7 +5,6 @@ import {
   isNil,
   lensPath,
   over,
-  path,
   set,
   uniq,
   view,
@@ -21,15 +20,15 @@ import {
   WithStyles
 } from 'src/components/core/styles';
 import Typography from 'src/components/core/Typography';
+import Select, { Item } from 'src/components/EnhancedSelect/Select';
 import ExpansionPanel from 'src/components/ExpansionPanel';
 import Grid from 'src/components/Grid';
 import LinearProgress from 'src/components/LinearProgress';
-import MenuItem from 'src/components/MenuItem';
 import Notice from 'src/components/Notice';
-import Select from 'src/components/Select';
 import TextField from 'src/components/TextField';
 import { getLinodes } from 'src/services/linodes';
 import { assignAddresses } from 'src/services/networking';
+import { getAPIErrorOrDefault } from 'src/utilities/errorUtils';
 
 type ClassNames =
   | 'containerDivider'
@@ -69,6 +68,7 @@ const styles: StyleRulesCallback<ClassNames> = theme => ({
     }
   },
   autoGridsm: {
+    minWidth: 175,
     [theme.breakpoints.up('sm')]: {
       maxWidth: 'auto',
       flexBasis: 'auto'
@@ -87,6 +87,7 @@ interface Props {
   linodeID: number;
   linodeRegion: string;
   ipAddresses: string[];
+  readOnly?: boolean;
   refreshIPs: () => Promise<void>;
 }
 
@@ -159,8 +160,8 @@ class LinodeNetworkingIPTransferPanel extends React.Component<
     sourceIPsLinodeID
   });
 
-  onModeChange = (ip: string) => (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const mode = e.target.value as Mode;
+  onModeChange = (ip: string) => (e: Item) => {
+    const mode = e.value as Mode;
     const firstLinode = this.state.linodes[0];
 
     this.setState(
@@ -205,12 +206,10 @@ class LinodeNetworkingIPTransferPanel extends React.Component<
     );
   };
 
-  onSelectedLinodeChange = (ip: string) => (
-    e: React.ChangeEvent<HTMLSelectElement>
-  ) => {
+  onSelectedLinodeChange = (ip: string) => (e: Item) => {
     this.setState(
       compose(
-        setSelectedLinodeID(ip, e.target.value),
+        setSelectedLinodeID(ip, e.value),
         /**
          * When mode is swapping;
          *  Update the selectedLinodesIPs (since the Linode has changed, the available IPs certainly have)
@@ -226,7 +225,7 @@ class LinodeNetworkingIPTransferPanel extends React.Component<
             /** We need to find and return the newly selected Linode's IPs. */
             updateSelectedLinodesIPs(ip, (currentIPs: string[]) => {
               const linode = this.state.linodes.find(
-                l => l.id === Number(e.target.value)
+                l => l.id === Number(e.value)
               );
               if (linode) {
                 return linode.ips;
@@ -237,7 +236,7 @@ class LinodeNetworkingIPTransferPanel extends React.Component<
             /** We need to find the selected Linode's IPs and return the first. */
             updateSelectedIP(ip, (currentIP: string) => {
               const linode = this.state.linodes.find(
-                l => l.id === Number(e.target.value)
+                l => l.id === Number(e.value)
               );
               if (linode) {
                 return linode.ips[0];
@@ -250,10 +249,8 @@ class LinodeNetworkingIPTransferPanel extends React.Component<
     );
   };
 
-  onSelectedIPChange = (ip: string) => (
-    e: React.ChangeEvent<HTMLSelectElement>
-  ) => {
-    this.setState(setSelectedIP(ip, e.target.value));
+  onSelectedIPChange = (ip: string) => (e: Item<string>) => {
+    this.setState(setSelectedIP(ip, e.value));
   };
 
   renderRow = (
@@ -261,7 +258,13 @@ class LinodeNetworkingIPTransferPanel extends React.Component<
     renderLinodeSelect?: (s: Move) => JSX.Element,
     renderIPSelect?: (s: Swap) => JSX.Element
   ) => {
-    const { classes } = this.props;
+    const { classes, readOnly } = this.props;
+
+    const actionsList = [
+      { label: 'Move To', value: 'move' },
+      { label: 'Swap With', value: 'swap' }
+    ];
+
     return (
       <Grid container key={state.sourceIP}>
         <Grid item xs={12}>
@@ -276,19 +279,15 @@ class LinodeNetworkingIPTransferPanel extends React.Component<
         </Grid>
         <Grid item xs={12} className={classes.autoGridsm}>
           <Select
-            value={state.mode}
+            defaultValue={state.mode}
+            options={actionsList}
             onChange={this.onModeChange(state.sourceIP)}
-            fullWidth={false}
             data-qa-ip-transfer-action-menu
-          >
-            <MenuItem value="none">Select Action</MenuItem>
-            <MenuItem value="move" data-qa-transfer-action="move">
-              Move To
-            </MenuItem>
-            <MenuItem value="swap" data-qa-transfer-action="swap">
-              Swap With
-            </MenuItem>
-          </Select>
+            disabled={readOnly}
+            placeholder="Select Action"
+            isClearable={false}
+            noMarginTop
+          />
         </Grid>
         {renderLinodeSelect && renderLinodeSelect(state as Move)}
         {renderIPSelect && renderIPSelect(state as Swap)}
@@ -297,42 +296,52 @@ class LinodeNetworkingIPTransferPanel extends React.Component<
   };
 
   linodeSelect = ({ mode, sourceIP, selectedLinodeID }: Move) => {
-    const { classes } = this.props;
+    const { classes, readOnly } = this.props;
+
+    const linodeList = this.state.linodes.map(l => {
+      return { label: l.label, value: l.id };
+    });
+
+    const defaultLinode = linodeList.find(eachLinode => {
+      return eachLinode.value === selectedLinodeID;
+    });
+
     return (
       <Grid item xs={12} className={classes.autoGridsm}>
         <Select
-          disabled={this.state.linodes.length === 1}
-          value={selectedLinodeID}
+          options={linodeList}
+          disabled={readOnly || this.state.linodes.length === 1}
+          defaultValue={defaultLinode}
           onChange={this.onSelectedLinodeChange(sourceIP)}
-          fullWidth={false}
-        >
-          {this.state.linodes.map(l => (
-            <MenuItem key={l.label} value={l.id}>
-              {l.label}
-            </MenuItem>
-          ))}
-        </Select>
+          isClearable={false}
+          noMarginTop
+        />
       </Grid>
     );
   };
 
   ipSelect = ({ sourceIP, selectedIP, selectedLinodesIPs }: Swap) => {
-    const { classes } = this.props;
+    const { classes, readOnly } = this.props;
+
+    const IPList = selectedLinodesIPs.map(ip => {
+      return { label: ip, value: ip };
+    });
+
+    const defaultIP = IPList.find(eachIP => {
+      return eachIP.value === selectedIP;
+    });
+
     return (
       <Grid item xs={12} className={classes.autoGridsm}>
         <Select
-          disabled={selectedLinodesIPs.length === 1}
-          value={selectedIP}
-          fullWidth={false}
+          disabled={readOnly || selectedLinodesIPs.length === 1}
+          defaultValue={defaultIP}
+          options={IPList}
           onChange={this.onSelectedIPChange(sourceIP)}
           data-qa-swap-ip-action-menu
-        >
-          {selectedLinodesIPs.map(ip => (
-            <MenuItem key={ip} value={ip} data-qa-swap-with={ip}>
-              {ip}
-            </MenuItem>
-          ))}
-        </Select>
+          isClearable={false}
+          noMarginTop
+        />
       </Grid>
     );
   };
@@ -376,7 +385,7 @@ class LinodeNetworkingIPTransferPanel extends React.Component<
     });
 
     assignAddresses(createRequestData(this.state.ips, this.props.linodeRegion))
-      .then(response => {
+      .then(() => {
         return Promise.all([this.props.refreshIPs(), this.getLinodes()])
           .then(() => {
             this.setState({
@@ -385,38 +394,23 @@ class LinodeNetworkingIPTransferPanel extends React.Component<
               successMessage: 'IP transferred successfully.'
             });
           })
-          .catch(() => {
+          .catch(err => {
             this.setState({
-              error: [
-                {
-                  field: 'none',
-                  reason: 'Unable to refresh IPs. Please reload the screen.'
-                }
-              ]
+              error: getAPIErrorOrDefault(
+                err,
+                'Unable to refresh IPs. Please reload the screen.'
+              )
             });
           });
       })
-      .catch(response => {
-        const apiErrors = path<Linode.ApiFieldError[]>(
-          ['response', 'data', 'errors'],
-          response
+      .catch(err => {
+        const apiErrors = getAPIErrorOrDefault(
+          err,
+          'Unable to transfer IP addresses at this time. Please try again later.'
         );
 
-        if (apiErrors) {
-          return this.setState({
-            error: uniq(apiErrors),
-            submitting: false
-          });
-        }
-
-        this.setState({
-          error: [
-            {
-              field: 'none',
-              reason:
-                'Unable to transfer IP addresses at this time. Please try again later.'
-            }
-          ],
+        return this.setState({
+          error: uniq(apiErrors),
           submitting: false
         });
       });
@@ -483,13 +477,14 @@ class LinodeNetworkingIPTransferPanel extends React.Component<
   };
 
   transferActions = () => {
+    const { readOnly } = this.props;
     return (
       <ActionsPanel>
         <Button
           loading={this.state.submitting}
           onClick={this.onSubmit}
           type="primary"
-          disabled={this.state.linodes.length === 0}
+          disabled={readOnly || this.state.linodes.length === 0}
           data-qa-ip-transfer-save
         >
           Save

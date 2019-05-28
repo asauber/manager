@@ -97,9 +97,9 @@ class Example extends React.Component<{}, State> {
     );
   };
 
-  loadOptions = (inputValue: string): Promise<Item[]> => {
+  loadOptions = (inputValue?: string): Promise<Item[]> => {
     return new Promise(resolve => {
-      setTimeout(() => resolve(this.filterFruit(inputValue)), 2000);
+      setTimeout(() => resolve(this.filterFruit(inputValue || '')), 2000);
     });
   };
 
@@ -164,13 +164,6 @@ class Example extends React.Component<{}, State> {
           onChange={this.handleChangeCreatable}
           options={tz}
           createNew={this.createNew}
-        />
-        <Select
-          variant="async"
-          loadOptions={this.loadOptions}
-          label="Async Select"
-          value={valueAsync}
-          onChange={this.handleChangeAsync}
         />
         <Select
           loadOptions={this.loadOptions}

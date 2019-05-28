@@ -1,13 +1,15 @@
 import withWidth, { WithWidth } from '@material-ui/core/withWidth';
 import * as moment from 'moment-timezone';
-import { InjectedNotistackProps, withSnackbar } from 'notistack';
+import { withSnackbar, WithSnackbarProps } from 'notistack';
 import { parse, stringify } from 'qs';
-import { pathOr } from 'ramda';
+import { path, pathOr } from 'ramda';
 import * as React from 'react';
 import { CSVLink } from 'react-csv';
-import { connect } from 'react-redux';
+import { connect, MapDispatchToProps } from 'react-redux';
 import { Link, RouteComponentProps, withRouter } from 'react-router-dom';
 import { compose, withStateHandlers } from 'recompose';
+import { AnyAction } from 'redux';
+import { ThunkDispatch } from 'redux-thunk';
 import ActionsPanel from 'src/components/ActionsPanel';
 import Button from 'src/components/Button';
 import CircleProgress from 'src/components/CircleProgress';
@@ -30,9 +32,15 @@ import { BackupsCTA } from 'src/features/Backups';
 import LinodeConfigSelectionDrawer, {
   LinodeConfigSelectionDrawerCallback
 } from 'src/features/LinodeConfigSelectionDrawer';
+import { ApplicationState } from 'src/store';
+import { deleteLinode } from 'src/store/linodes/linode.requests';
 import { MapState } from 'src/store/types';
-import { sendEvent } from 'src/utilities/analytics';
+import { getErrorStringOrDefault } from 'src/utilities/errorUtils';
 import formatDate from 'src/utilities/formatDate';
+import {
+  sendGroupByTagEnabledEvent,
+  sendLinodesViewEvent
+} from 'src/utilities/ga';
 import { storage, views } from 'src/utilities/storage';
 import CardView from './CardView';
 import DisplayGroupedLinodes from './DisplayGroupedLinodes';
@@ -53,8 +61,10 @@ interface ConfigDrawerState {
 
 interface State {
   configDrawer: ConfigDrawerState;
-  powerAlertOpen: boolean;
-  bootOption: Linode.BootAction;
+  confirmationOpen: boolean;
+  confirmationError?: string;
+  confirmationLoading: boolean;
+  actionOption: Linode.KebabAction;
   selectedLinodeId: number | null;
   selectedLinodeLabel: string;
   groupByTag: boolean;
@@ -72,10 +82,11 @@ type CombinedProps = WithImagesProps &
   WithWidth &
   ToggleGroupByTagsProps &
   StateProps &
+  DispatchProps &
   RouteProps &
   StyleProps &
   SetDocsProps &
-  InjectedNotistackProps &
+  WithSnackbarProps &
   BackupCTAProps;
 
 export class ListLinodes extends React.Component<CombinedProps, State> {
@@ -89,8 +100,10 @@ export class ListLinodes extends React.Component<CombinedProps, State> {
       selected: undefined,
       action: (id: number) => null
     },
-    powerAlertOpen: false,
-    bootOption: null,
+    confirmationOpen: false,
+    confirmationError: undefined,
+    confirmationLoading: false,
+    actionOption: null,
     selectedLinodeId: null,
     selectedLinodeLabel: '',
     groupByTag: false,
@@ -141,11 +154,7 @@ export class ListLinodes extends React.Component<CombinedProps, State> {
       views.linode.set('list');
     }
 
-    sendEvent({
-      category: ListLinodes.eventCategory,
-      action: 'switch view',
-      label: style
-    });
+    sendLinodesViewEvent(ListLinodes.eventCategory, style);
   };
 
   selectConfig = (id: number) => {
@@ -166,31 +175,64 @@ export class ListLinodes extends React.Component<CombinedProps, State> {
   };
 
   toggleDialog = (
-    bootOption: Linode.BootAction,
+    actionOption: Linode.KebabAction,
     selectedLinodeId: number,
     selectedLinodeLabel: string
   ) => {
     this.setState({
-      powerAlertOpen: !this.state.powerAlertOpen,
+      confirmationOpen: !this.state.confirmationOpen,
+      confirmationError: undefined,
       selectedLinodeId,
       selectedLinodeLabel,
-      bootOption
+      actionOption
     });
   };
 
-  rebootOrPowerLinode = () => {
-    const { bootOption, selectedLinodeId, selectedLinodeLabel } = this.state;
-    if (bootOption === 'reboot') {
-      rebootLinode(
-        this.openConfigDrawer,
-        selectedLinodeId!,
-        selectedLinodeLabel,
-        this.props.enqueueSnackbar
+  deleteLinode = (linodeId: number) => {
+    const _deleteLinode = this.props.deleteLinode;
+    _deleteLinode(linodeId)
+      .then(_ =>
+        this.setState({
+          confirmationOpen: false,
+          confirmationLoading: false,
+          confirmationError: undefined
+        })
+      )
+      .catch(err =>
+        this.setState({
+          confirmationLoading: false,
+          confirmationError: getErrorStringOrDefault(
+            err,
+            'There was an error deleting your Linode.'
+          )
+        })
       );
-    } else {
-      powerOffLinode(selectedLinodeId!, selectedLinodeLabel);
+  };
+
+  executeAction = () => {
+    const { actionOption, selectedLinodeId, selectedLinodeLabel } = this.state;
+    this.setState({ confirmationError: undefined, confirmationLoading: true });
+    switch (actionOption) {
+      case 'reboot':
+        rebootLinode(
+          this.openConfigDrawer,
+          selectedLinodeId!,
+          selectedLinodeLabel,
+          this.props.enqueueSnackbar
+        );
+        this.setState({ confirmationOpen: false, confirmationLoading: false });
+        break;
+      case 'power_down':
+        powerOffLinode(selectedLinodeId!, selectedLinodeLabel);
+        this.setState({ confirmationOpen: false, confirmationLoading: false });
+        break;
+      case 'delete':
+        this.deleteLinode(selectedLinodeId!);
+        break;
+      default:
+        this.setState({ confirmationOpen: false });
+        break;
     }
-    this.setState({ powerAlertOpen: false });
   };
 
   dismissCTA = () => {
@@ -214,7 +256,12 @@ export class ListLinodes extends React.Component<CombinedProps, State> {
       backupsCTA
     } = this.props;
 
-    const { configDrawer, bootOption, powerAlertOpen } = this.state;
+    const {
+      configDrawer,
+      actionOption,
+      confirmationError,
+      confirmationOpen
+    } = this.state;
 
     const params: Params = parse(this.props.location.search, {
       ignoreQueryPrefix: true
@@ -304,7 +351,6 @@ export class ListLinodes extends React.Component<CombinedProps, State> {
             >
               <Grid item className={classes.title}>
                 <Typography
-                  role="header"
                   variant="h1"
                   className={this.props.classes.title}
                   data-qa-title
@@ -372,17 +418,18 @@ export class ListLinodes extends React.Component<CombinedProps, State> {
             />
             <ConfirmationDialog
               title={
-                bootOption === 'reboot' ? 'Confirm Reboot' : 'Powering Off'
+                actionOption === 'reboot'
+                  ? `Reboot ${this.state.selectedLinodeLabel}?`
+                  : actionOption === 'power_down'
+                  ? `Power Off ${this.state.selectedLinodeLabel}?`
+                  : `Delete ${this.state.selectedLinodeLabel}?`
               }
               actions={this.renderConfirmationActions}
-              open={powerAlertOpen}
+              open={confirmationOpen}
               onClose={this.closePowerAlert}
+              error={confirmationError}
             >
-              <Typography>
-                {bootOption === 'reboot'
-                  ? 'Are you sure you want to reboot your Linode?'
-                  : 'Are you sure you want to power down your Linode?'}
-              </Typography>
+              <Typography>{getConfirmationMessage(actionOption)}</Typography>
             </ConfirmationDialog>
           </Grid>
         </Grid>
@@ -396,7 +443,7 @@ export class ListLinodes extends React.Component<CombinedProps, State> {
   }
 
   renderConfirmationActions = () => {
-    const { bootOption } = this.state;
+    const { actionOption, confirmationLoading } = this.state;
     return (
       <ActionsPanel style={{ padding: 0 }}>
         <Button
@@ -407,18 +454,37 @@ export class ListLinodes extends React.Component<CombinedProps, State> {
           Cancel
         </Button>
         <Button
-          type="primary"
-          onClick={this.rebootOrPowerLinode}
+          type="secondary"
+          onClick={this.executeAction}
           data-qa-confirm-cancel
+          loading={confirmationLoading}
+          destructive={actionOption === 'delete'}
         >
-          {bootOption === 'reboot' ? 'Reboot' : 'Power Off'}
+          {actionOption === 'reboot'
+            ? 'Reboot'
+            : actionOption === 'power_down'
+            ? 'Power Off'
+            : 'Delete'}
         </Button>
       </ActionsPanel>
     );
   };
 
-  closePowerAlert = () => this.setState({ powerAlertOpen: false });
+  closePowerAlert = () => this.setState({ confirmationOpen: false });
 }
+
+const getConfirmationMessage = (actionOption: Linode.KebabAction) => {
+  switch (actionOption) {
+    case 'reboot':
+      return 'Are you sure you want to reboot your Linode?';
+    case 'power_down':
+      return 'Are you sure you want to power down your Linode?';
+    case 'delete':
+      return 'Are you sure you want to delete your Linode? This will result in permanent data loss.';
+    default:
+      return 'Are you sure?';
+  }
+};
 
 const getUserSelectedDisplay = (
   value?: string
@@ -455,16 +521,29 @@ const mapStateToProps: MapState<StateProps, {}> = (state, ownProps) => {
     linodesCount: state.__resources.linodes.results.length,
     linodesData: state.__resources.linodes.entities,
     linodesRequestLoading: state.__resources.linodes.loading,
-    linodesRequestError: state.__resources.linodes.error
+    linodesRequestError: path(['error', 'read'], state.__resources.linodes)
   };
 };
+
+interface DispatchProps {
+  deleteLinode: (linodeId: number) => Promise<{}>;
+}
+
+const mapDispatchToProps: MapDispatchToProps<DispatchProps, {}> = (
+  dispatch: ThunkDispatch<ApplicationState, undefined, AnyAction>
+) => ({
+  deleteLinode: (linodeId: number) => dispatch(deleteLinode({ linodeId }))
+});
 
 interface ToggleGroupByTagsProps {
   groupByTags: boolean;
   toggleGroupByTag: (e: React.ChangeEvent<any>, checked: boolean) => void;
 }
 
-const connected = connect(mapStateToProps);
+const connected = connect(
+  mapStateToProps,
+  mapDispatchToProps
+);
 
 const toggleGroupState = withStateHandlers(
   (ownProps: RouteProps) => {
@@ -478,11 +557,7 @@ const toggleGroupState = withStateHandlers(
     toggleGroupByTag: (state, ownProps) => (e, checked) => {
       storage.views.grouped.set(checked ? 'true' : 'false');
 
-      sendEvent({
-        category: ListLinodes.eventCategory,
-        action: 'group by tag',
-        label: String(checked)
-      });
+      sendGroupByTagEnabledEvent(ListLinodes.eventCategory, checked);
 
       return { ...state, groupByTags: checked };
     }

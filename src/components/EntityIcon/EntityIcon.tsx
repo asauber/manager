@@ -1,18 +1,21 @@
 import * as classNames from 'classnames';
+import { pathOr } from 'ramda';
 import * as React from 'react';
-import {
-  StyleRulesCallback,
-  withStyles,
-  WithStyles
-} from 'src/components/core/styles';
-import { spacing as themeSpacingStorage } from 'src/utilities/storage';
-
+import { compose } from 'recompose';
 import DomainIcon from 'src/assets/icons/entityIcons/domain.svg';
 import LinodeIcon from 'src/assets/icons/entityIcons/linode.svg';
 import LoadingIcon from 'src/assets/icons/entityIcons/loading.svg';
 import NodeBalancerIcon from 'src/assets/icons/entityIcons/nodebalancer.svg';
 import StackScriptIcon from 'src/assets/icons/entityIcons/stackscript.svg';
 import VolumeIcon from 'src/assets/icons/entityIcons/volume.svg';
+import {
+  StyleRulesCallback,
+  withStyles,
+  WithStyles,
+  withTheme,
+  WithTheme
+} from 'src/components/core/styles';
+import { COMPACT_SPACING_UNIT } from 'src/themeFactory';
 
 type ClassNames =
   | 'root'
@@ -61,8 +64,15 @@ const styles: StyleRulesCallback<ClassNames> = theme => ({
   }
 });
 
+export type Variant =
+  | 'linode'
+  | 'nodebalancer'
+  | 'volume'
+  | 'domain'
+  | 'stackscript';
+
 interface Props {
-  variant: 'linode' | 'nodebalancer' | 'volume' | 'domain' | 'stackscript';
+  variant: Variant;
   status?: string;
   loading?: boolean;
   size?: number;
@@ -71,7 +81,19 @@ interface Props {
   stopAnimation?: boolean;
 }
 
-type CombinedProps = Props & WithStyles<ClassNames>;
+type CombinedProps = Props & WithStyles<ClassNames> & WithTheme;
+
+const iconMap = {
+  linode: LinodeIcon,
+  nodebalancer: NodeBalancerIcon,
+  volume: VolumeIcon,
+  domain: DomainIcon,
+  stackscript: StackScriptIcon
+};
+
+const getIcon = (variant: Variant) => {
+  return pathOr(LinodeIcon, [variant], iconMap);
+};
 
 const EntityIcon: React.StatelessComponent<CombinedProps> = props => {
   const {
@@ -82,23 +104,17 @@ const EntityIcon: React.StatelessComponent<CombinedProps> = props => {
     size,
     className,
     marginTop,
-    stopAnimation
+    stopAnimation,
+    ...rest
   } = props;
 
   const iconSize = size
     ? size
-    : themeSpacingStorage.get() === 'compact'
+    : props.theme.spacing.unit === COMPACT_SPACING_UNIT
     ? 34
     : 40;
-  const iconMap = {
-    linode: LinodeIcon,
-    nodebalancer: NodeBalancerIcon,
-    volume: VolumeIcon,
-    domain: DomainIcon,
-    stackscript: StackScriptIcon
-  };
 
-  const Icon = iconMap[variant];
+  const Icon = getIcon(variant);
 
   const getStatusForDomain = (dStatus: string) => {
     switch (dStatus) {
@@ -132,6 +148,7 @@ const EntityIcon: React.StatelessComponent<CombinedProps> = props => {
       data-qa-entity-status={status || 'undefined'}
       data-qa-is-loading={loading || 'false'}
       aria-label={`${variant} is ${finalStatus}`}
+      {...rest}
     >
       <Icon
         className={classNames({
@@ -159,4 +176,9 @@ const EntityIcon: React.StatelessComponent<CombinedProps> = props => {
 
 const styled = withStyles(styles);
 
-export default styled(EntityIcon);
+const enhanced = compose<CombinedProps, Props>(
+  styled,
+  withTheme()
+);
+
+export default enhanced(EntityIcon);

@@ -13,10 +13,17 @@ export interface Action {
   title: string;
   disabled?: boolean;
   tooltip?: string;
-  onClick: (e: React.MouseEvent<HTMLAnchorElement>) => void;
+  isLoading?: boolean;
+  onClick: (e: React.MouseEvent<HTMLElement>) => void;
 }
 
-type CSSClasses = 'root' | 'item' | 'button' | 'actionSingleLink' | 'hidden';
+type CSSClasses =
+  | 'root'
+  | 'item'
+  | 'button'
+  | 'actionSingleLink'
+  | 'hidden'
+  | 'menu';
 
 const styles: StyleRulesCallback<CSSClasses> = theme => ({
   root: {
@@ -55,11 +62,14 @@ const styles: StyleRulesCallback<CSSClasses> = theme => ({
     marginRight: theme.spacing.unit,
     whiteSpace: 'nowrap',
     float: 'right',
-    fontFamily: 'LatoWebBold'
+    fontFamily: theme.font.bold
   },
   hidden: {
     height: 0,
     padding: 0
+  },
+  menu: {
+    maxWidth: theme.spacing.unit * 25
   }
 });
 
@@ -117,7 +127,7 @@ export class ActionMenu extends React.Component<CombinedProps, State> {
     }
 
     return (
-      <div className={classes.root}>
+      <div className={`${classes.root} action-menu`}>
         <IconButton
           aria-owns={anchorEl ? 'action-menu' : undefined}
           aria-expanded={anchorEl ? true : undefined}
@@ -130,12 +140,19 @@ export class ActionMenu extends React.Component<CombinedProps, State> {
         </IconButton>
         <Menu
           id="action-menu"
+          className={classes.menu}
           anchorEl={anchorEl}
           getContentAnchorEl={undefined}
           anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
           transformOrigin={{ vertical: 'top', horizontal: 'right' }}
           open={Boolean(anchorEl)}
           onClose={this.handleClose}
+          BackdropProps={{
+            style: {
+              backgroundColor: 'transparent'
+            },
+            'data-qa-backdrop': true
+          }}
         >
           <MenuItem key="placeholder" aria-hidden className={classes.hidden} />
           {(actions as Action[]).map((a, idx) => (
@@ -146,6 +163,7 @@ export class ActionMenu extends React.Component<CombinedProps, State> {
               data-qa-action-menu-item={a.title}
               disabled={a.disabled}
               tooltip={a.tooltip}
+              isLoading={a.isLoading}
             >
               {a.title}
             </MenuItem>

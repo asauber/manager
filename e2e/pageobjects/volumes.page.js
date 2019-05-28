@@ -16,7 +16,6 @@ class Volumes extends Page {
         if (initial) {
             this.placeholderText.waitForVisible();
         } else {
-            this.sidebarTitle.waitForVisible(constants.wait.normal);
             this.volumeCellElem.waitForVisible(constants.wait.normal);
         }
     }
@@ -45,7 +44,7 @@ class Volumes extends Page {
         const dialogCancel = $(this.cancelButton.selector);
 
         expect(dialogTitle.isVisible()).toBe(true);
-        expect(dialogTitle.getText()).toBe('Delete Volume');
+        expect(dialogTitle.getText()).toMatch('Delete');
         expect(dialogConfirm.isVisible()).toBe(true);
         expect(dialogConfirm.getTagName()).toBe('button');
         expect(dialogCancel.isVisible()).toBe(true);

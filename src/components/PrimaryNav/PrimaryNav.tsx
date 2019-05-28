@@ -16,10 +16,14 @@ import {
   WithTheme
 } from 'src/components/core/styles';
 import Grid from 'src/components/Grid';
+import { isObjectStorageEnabled } from 'src/constants';
 import { MapState } from 'src/store/types';
-import isPathOneOf from 'src/utilities/routing/isPathOneOf';
+import { sendSpacingToggleEvent, sendThemeToggleEvent } from 'src/utilities/ga';
+import AdditionalMenuItems from './AdditionalMenuItems';
 import SpacingToggle from './SpacingToggle';
 import ThemeToggle from './ThemeToggle';
+
+import { linkIsActive } from './utils';
 
 interface PrimaryLink {
   display: string;
@@ -66,7 +70,7 @@ const styles: StyleRulesCallback<ClassNames> = theme => ({
   },
   fadeContainer: {
     width: '100%',
-    height: '100%',
+    height: 'calc(100% - 80px)',
     display: 'flex',
     flexDirection: 'column'
   },
@@ -79,6 +83,7 @@ const styles: StyleRulesCallback<ClassNames> = theme => ({
     padding: `${theme.spacing.unit + 2}px 0 ${theme.spacing.unit}px`
   },
   listItem: {
+    cursor: 'pointer',
     borderLeft: '6px solid transparent',
     transition: theme.transitions.create([
       'background-color',
@@ -112,7 +117,7 @@ const styles: StyleRulesCallback<ClassNames> = theme => ({
   linkItem: {
     transition: theme.transitions.create(['color']),
     color: '#C9CACB',
-    fontFamily: 'LatoWebBold'
+    fontFamily: 'LatoWebBold' // we keep this bold at all times
   },
   active: {
     transition: 'border-color .7s ease-in-out',
@@ -249,7 +254,7 @@ export class PrimaryNav extends React.Component<CombinedProps, State> {
       isManagedAccount
     } = this.props;
 
-    const primaryLinks = [
+    const primaryLinks: PrimaryLink[] = [
       { display: 'Dashboard', href: '/dashboard', key: 'dashboard' }
     ];
 
@@ -260,6 +265,14 @@ export class PrimaryNav extends React.Component<CombinedProps, State> {
     // if (canAccessVolumes) {
     primaryLinks.push({ display: 'Volumes', href: '/volumes', key: 'volumes' });
     // }
+
+    if (isObjectStorageEnabled) {
+      primaryLinks.push({
+        display: 'Object Storage',
+        href: '/object-storage/buckets',
+        key: 'objectStorage'
+      });
+    }
 
     // if (canAccessNodeBalancers) {
     primaryLinks.push({
@@ -309,12 +322,6 @@ export class PrimaryNav extends React.Component<CombinedProps, State> {
       });
     }
 
-    primaryLinks.push({
-      display: 'Get Help',
-      href: '/support',
-      key: 'support'
-    });
-
     this.setState({ primaryLinks });
   };
 
@@ -322,10 +329,6 @@ export class PrimaryNav extends React.Component<CombinedProps, State> {
     const { history, closeMenu } = this.props;
     history.push(href);
     closeMenu();
-  };
-
-  linkIsActive = (href: string) => {
-    return isPathOneOf([href], this.props.location.pathname);
   };
 
   expandMenutItem = (e: React.MouseEvent<HTMLElement>) => {
@@ -361,6 +364,24 @@ export class PrimaryNav extends React.Component<CombinedProps, State> {
     this.setState({ anchorEl: undefined });
   };
 
+  handleSpacingToggle = () => {
+    const { toggleSpacing, theme } = this.props;
+    const { spacing: spacingUnit } = theme;
+    // Checking the previous spacingUnit value to determine which way to switch.
+    const eventLabel = spacingUnit.unit === 8 ? 'compact' : 'normal';
+    toggleSpacing();
+    sendSpacingToggleEvent(eventLabel);
+  };
+
+  handleThemeToggle = () => {
+    const { toggleTheme, theme } = this.props;
+    // Checking the previous theme.name value to determine which way to switch.
+    const eventLabel = theme.name === 'darkTheme' ? 'light' : 'dark';
+
+    toggleTheme();
+    sendThemeToggleEvent(eventLabel);
+  };
+
   renderPrimaryLink = (primaryLink: PrimaryLink, isLast: boolean) => {
     const { classes } = this.props;
 
@@ -374,7 +395,7 @@ export class PrimaryNav extends React.Component<CombinedProps, State> {
           data-qa-nav-item={primaryLink.key}
           className={classNames({
             [classes.listItem]: true,
-            [classes.active]: this.linkIsActive(primaryLink.href)
+            [classes.active]: linkIsActive(primaryLink.href)
           })}
         >
           <ListItemText
@@ -391,7 +412,7 @@ export class PrimaryNav extends React.Component<CombinedProps, State> {
   };
 
   render() {
-    const { classes, toggleSpacing, toggleTheme, theme } = this.props;
+    const { classes, theme } = this.props;
     const { expandedMenus, anchorEl } = this.state;
     const { spacing: spacingUnit } = theme;
 
@@ -433,6 +454,21 @@ export class PrimaryNav extends React.Component<CombinedProps, State> {
               this.renderPrimaryLink(primaryLink, id === arr.length - 1)
             )}
 
+            {/** menu items under the main navigation links */}
+            <AdditionalMenuItems
+              linkClasses={(href?: string) =>
+                classNames({
+                  [classes.listItem]: true,
+                  [classes.active]: href ? linkIsActive(href) : false
+                })
+              }
+              listItemClasses={classNames({
+                [classes.linkItem]: true
+              })}
+              closeMenu={this.props.closeMenu}
+              dividerClasses={classes.divider}
+            />
+
             <Hidden mdUp>
               <Divider className={classes.divider} />
               <Link
@@ -445,7 +481,7 @@ export class PrimaryNav extends React.Component<CombinedProps, State> {
                   [classes.listItem]: true,
                   [classes.active]:
                     expandedMenus.support ||
-                    this.linkIsActive('/profile/display') === true
+                    linkIsActive('/profile/display') === true
                 })}
               >
                 <ListItemText
@@ -495,10 +531,13 @@ export class PrimaryNav extends React.Component<CombinedProps, State> {
               anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
               transformOrigin={{ vertical: 'bottom', horizontal: 'center' }}
               className={classes.menu}
-              BackdropProps={{ className: classes.settingsBackdrop }}
+              BackdropProps={{
+                className: classes.settingsBackdrop,
+                'data-qa-backdrop': true
+              }}
             >
-              <ThemeToggle toggleTheme={toggleTheme} />
-              <SpacingToggle toggleSpacing={toggleSpacing} />
+              <ThemeToggle toggleTheme={this.handleThemeToggle} />
+              <SpacingToggle toggleSpacing={this.handleSpacingToggle} />
             </Menu>
           </div>
         </Grid>

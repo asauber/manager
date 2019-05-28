@@ -10,15 +10,15 @@ import {
   withStyles
 } from 'src/components/core/styles';
 import Typography from 'src/components/core/Typography';
+import Select, { Item } from 'src/components/EnhancedSelect/Select';
 import ExpansionPanel from 'src/components/ExpansionPanel';
 import Grid from 'src/components/Grid';
 import LinearProgress from 'src/components/LinearProgress';
-import MenuItem from 'src/components/MenuItem';
 import RenderGuard from 'src/components/RenderGuard';
-import Select from 'src/components/Select';
 import TextField from 'src/components/TextField';
 import { getLinodes } from 'src/services/linodes';
 import { shareAddresses } from 'src/services/networking';
+import { getAPIErrorOrDefault } from 'src/utilities/errorUtils';
 import getAPIErrorsFor from 'src/utilities/getAPIErrorFor';
 
 type ClassNames =
@@ -29,6 +29,7 @@ type ClassNames =
   | 'noIPsMessage'
   | 'networkActionText'
   | 'removeCont'
+  | 'addNewIP'
   | 'remove';
 
 const styles: StyleRulesCallback<ClassNames> = theme => ({
@@ -61,6 +62,9 @@ const styles: StyleRulesCallback<ClassNames> = theme => ({
       width: '100%'
     }
   },
+  addNewIP: {
+    marginLeft: -(theme.spacing.unit + theme.spacing.unit / 2)
+  },
   remove: {
     [theme.breakpoints.down('xs')]: {
       margin: '-16px 0 0 -26px'
@@ -73,6 +77,7 @@ interface Props {
   linodeRegion: string;
   linodeIPs: string[];
   linodeSharedIPs: string[];
+  readOnly?: boolean;
   refreshIPs: () => Promise<void>;
 }
 
@@ -135,8 +140,8 @@ class IPSharingPanel extends React.Component<CombinedProps, State> {
           loading: false
         });
       })
-      .catch(response => {
-        const errors = pathOr([], ['response', 'data', 'errors'], response);
+      .catch(errorResponse => {
+        const errors = getAPIErrorOrDefault(errorResponse);
         if (!this.mounted) {
           return;
         }
@@ -174,12 +179,12 @@ class IPSharingPanel extends React.Component<CombinedProps, State> {
     );
   };
 
-  onIPSelect = (ipIdx: number) => (e: React.ChangeEvent<HTMLSelectElement>) => {
+  onIPSelect = (ipIdx: number) => (e: Item<string>) => {
     if (ipIdx === undefined) {
       return;
     }
     const newIPsToShare = clone(this.state.ipsToShare);
-    newIPsToShare[+ipIdx] = e.target.value;
+    newIPsToShare[+ipIdx] = e.value;
     if (!this.mounted) {
       return;
     }
@@ -210,7 +215,21 @@ class IPSharingPanel extends React.Component<CombinedProps, State> {
   };
 
   renderShareIPRow = (ip: string, idx: number) => {
-    const { classes } = this.props;
+    const { classes, readOnly } = this.props;
+
+    const ipList = this.remainingChoices(ip).map((ipChoice: string) => {
+      const label = `${ipChoice} ${
+        this.state.ipChoiceLabels[ipChoice] !== undefined
+          ? this.state.ipChoiceLabels[ipChoice]
+          : ''
+      }`;
+      return { label, value: ipChoice };
+    });
+
+    const defaultIP = ipList.find(eachIP => {
+      return eachIP.value === ip;
+    });
+
     return (
       <Grid container key={idx}>
         <Grid item xs={12}>
@@ -218,25 +237,23 @@ class IPSharingPanel extends React.Component<CombinedProps, State> {
         </Grid>
         <Grid item xs={12} sm={10}>
           <Select
-            value={ip}
+            defaultValue={defaultIP}
+            options={ipList}
             onChange={this.onIPSelect(idx)}
-            fullWidth={false}
             className={classes.ipField}
-          >
-            {this.remainingChoices(ip).map(
-              (ipChoice: string, choiceIdx: number) => (
-                <MenuItem data-ip-idx={idx} key={choiceIdx} value={ipChoice}>
-                  {ipChoice} {this.state.ipChoiceLabels[ipChoice]}
-                </MenuItem>
-              )
-            )}
-          </Select>
+            data-qa-share-ip
+            disabled={readOnly}
+            isClearable={false}
+            placeholder="Select an IP"
+          />
         </Grid>
         <Grid item className={classes.removeCont}>
           <Button
             type="remove"
             onClick={this.onIPDelete(idx)}
             className={classes.remove}
+            data-qa-remove-shared-ip
+            disabled={readOnly}
           />
         </Grid>
       </Grid>
@@ -277,11 +294,10 @@ class IPSharingPanel extends React.Component<CombinedProps, State> {
           successMessage: 'IP Sharing updated successfully'
         });
       })
-      .catch(response => {
-        const errors = pathOr(
-          [{ reason: 'Unable to complete request at this time.' }],
-          ['response', 'data', 'errors'],
-          response
+      .catch(errorResponse => {
+        const errors = getAPIErrorOrDefault(
+          errorResponse,
+          'Unable to complete request at this time.'
         );
 
         if (!this.mounted) {
@@ -307,15 +323,17 @@ class IPSharingPanel extends React.Component<CombinedProps, State> {
   };
 
   renderActions = () => {
+    const { readOnly } = this.props;
     const { submitting, loading } = this.state;
     const noChoices = this.state.ipChoices.length <= 1;
     return (
       <ActionsPanel>
         <Button
           loading={submitting}
-          disabled={loading || noChoices}
+          disabled={readOnly || loading || noChoices}
           onClick={this.onSubmit}
           type="primary"
+          data-qa-submit
         >
           Save
         </Button>
@@ -323,6 +341,7 @@ class IPSharingPanel extends React.Component<CombinedProps, State> {
           disabled={submitting || loading || noChoices}
           onClick={this.onCancel}
           type="secondary"
+          data-qa-cancel
         >
           Cancel
         </Button>
@@ -331,7 +350,7 @@ class IPSharingPanel extends React.Component<CombinedProps, State> {
   };
 
   render() {
-    const { classes, linodeIPs } = this.props;
+    const { classes, linodeIPs, readOnly } = this.props;
     const {
       errors,
       successMessage,
@@ -384,8 +403,9 @@ class IPSharingPanel extends React.Component<CombinedProps, State> {
                   <div className={classes.addNewButton}>
                     <AddNewLink
                       label="Add IP Address"
+                      disabled={readOnly}
                       onClick={this.addIPToShare}
-                      left
+                      className={classes.addNewIP}
                     />
                   </div>
                 )}

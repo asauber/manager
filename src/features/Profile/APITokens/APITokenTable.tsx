@@ -1,5 +1,5 @@
 import * as moment from 'moment';
-import { compose, path } from 'ramda';
+import { compose } from 'ramda';
 import * as React from 'react';
 import ActionsPanel from 'src/components/ActionsPanel';
 import AddNewLink from 'src/components/AddNewLink';
@@ -33,6 +33,7 @@ import {
   getPersonalAccessTokens,
   updatePersonalAccessToken
 } from 'src/services/profile';
+import { getAPIErrorOrDefault } from 'src/utilities/errorUtils';
 import isPast from 'src/utilities/isPast';
 import scrollErrorIntoView from 'src/utilities/scrollErrorIntoView';
 import APITokenDrawer, { DrawerMode, genExpiryTups } from './APITokenDrawer';
@@ -247,9 +248,9 @@ export class APITokenTable extends React.Component<CombinedProps, State> {
   };
 
   showDialogError(err: any) {
-    const apiError = path<Linode.ApiFieldError[]>(
-      ['response', 'data', 'error'],
-      err
+    const apiError = getAPIErrorOrDefault(
+      err,
+      'Unable to complete your request at this time.'
     );
 
     return this.setState({
@@ -258,13 +259,6 @@ export class APITokenTable extends React.Component<CombinedProps, State> {
         open: true,
         submitting: false,
         errors: apiError
-          ? apiError
-          : [
-              {
-                field: 'none',
-                reason: 'Unable to complete your request at this time.'
-              }
-            ]
       }
     });
   }
@@ -345,7 +339,7 @@ export class APITokenTable extends React.Component<CombinedProps, State> {
               {
                 form: {
                   ...form,
-                  errors: path(['response', 'data', 'errors'], errResponse)
+                  errors: getAPIErrorOrDefault(errResponse)
                 }
               },
               () => {
@@ -400,7 +394,7 @@ export class APITokenTable extends React.Component<CombinedProps, State> {
           {
             form: {
               ...this.state.form,
-              errors: path(['response', 'data', 'errors'], errResponse)
+              errors: getAPIErrorOrDefault(errResponse)
             }
           },
           () => {
@@ -451,7 +445,7 @@ export class APITokenTable extends React.Component<CombinedProps, State> {
     return tokens.map((token: Linode.Token) => (
       <TableRow key={token.id} data-qa-table-row={token.label}>
         <TableCell parentColumn="Label">
-          <Typography role="header" variant="h3" data-qa-token-label>
+          <Typography variant="h3" data-qa-token-label>
             {token.label}
           </Typography>
         </TableCell>
@@ -462,13 +456,13 @@ export class APITokenTable extends React.Component<CombinedProps, State> {
         </TableCell>
         <TableCell parentColumn="Expires">
           <Typography variant="body1" data-qa-token-expiry>
-            {/**
-             * The expiry time of tokens that never expire are returned from the API as
-             * 200 years in the future, so we just need to check that they're at least
-             * 100 years into the future to safely assume they never expire.
-             *
-             * The expiry time of apps that don't expire until revoked come back as 'null'.
-             * In this case, we display an expiry time of "never" as well.
+            {/*
+             The expiry time of tokens that never expire are returned from the API as
+             200 years in the future, so we just need to check that they're at least
+             100 years into the future to safely assume they never expire.
+
+             The expiry time of apps that don't expire until revoked come back as 'null'.
+             In this case, we display an expiry time of "never" as well.
              */
             isWayInTheFuture(token.expiry) || token.expiry === null ? (
               'never'
@@ -500,7 +494,6 @@ export class APITokenTable extends React.Component<CombinedProps, State> {
         <Grid container justify="space-between" alignItems="flex-end">
           <Grid item>
             <Typography
-              role="header"
               variant="h2"
               className={classes.headline}
               data-qa-table={type}
@@ -571,6 +564,7 @@ export class APITokenTable extends React.Component<CombinedProps, State> {
           actions={this.renderPersonalAccessTokenDisplayActions}
           open={Boolean(this.state.token && this.state.token.open)}
           onClose={this.closeTokenDialog}
+          maxWidth="md"
         >
           <Typography variant="body1">
             {`Your personal access token has been created.

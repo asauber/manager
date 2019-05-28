@@ -67,6 +67,7 @@ namespace Linode {
     severity: NotificationSeverity;
     when: null | string;
     until: null | string;
+    body: null | string;
   }
 
   export interface Entity {
@@ -77,9 +78,14 @@ namespace Linode {
   }
 
   export type EventAction =
+    | 'account_update'
+    | 'account_settings_update'
     | 'backups_cancel'
     | 'backups_enable'
     | 'backups_restore'
+    | 'community_like'
+    | 'community_question_reply'
+    | 'credit_card_updated'
     | 'disk_create'
     | 'disk_update'
     | 'disk_delete'
@@ -100,6 +106,7 @@ namespace Linode {
     | 'linode_create'
     | 'linode_update'
     | 'linode_delete'
+    | 'linode_deleteip'
     | 'linode_migrate'
     | 'linode_reboot'
     | 'linode_resize'
@@ -121,6 +128,9 @@ namespace Linode {
     | 'stackscript_delete'
     | 'stackscript_publicize'
     | 'stackscript_revise'
+    | 'tfa_enabled'
+    | 'tfa_disabled'
+    | 'ticket_attachment_upload'
     | 'user_ssh_key_add'
     | 'user_ssh_key_update'
     | 'user_ssh_key_delete'

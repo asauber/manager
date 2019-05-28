@@ -60,7 +60,7 @@ const styles: StyleRulesCallback<ClassNames> = theme => ({
   },
   count: {
     color: 'white',
-    fontFamily: 'LatoWebBold',
+    fontFamily: 'LatoWebBold', // we keep this bold at all times
     display: 'block',
     fontSize: '.7rem',
     lineHeight: 0,
@@ -91,6 +91,9 @@ const UserEventsButton: React.StatelessComponent<CombinedProps> = ({
       className={`${classes.root} ${className}`}
       disabled={disabled}
       aria-label="User Events"
+      aria-owns={open ? 'menu-list-grow' : undefined}
+      aria-haspopup="true"
+      data-testid="ueb"
     >
       <NotificationIcon className={classes.icon} />
       {count && count > 0 ? (

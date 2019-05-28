@@ -18,6 +18,10 @@ body {
   font-family: 'LatoWeb', sans-serif;
 }
 
+body.searchOverlay #main-content {
+  opacity: 0.5;
+}
+
 @media screen and (min-width: 960px) {
   body {
     /* fix for scrollbar compoensation */
@@ -104,6 +108,16 @@ body {
   height: 100%;
 }
 
+.visually-hidden {
+  /* https://snook.ca/archives/html_and_css/hiding-content-for-accessibility */
+  position: absolute !important;
+  height: 1px;
+  width: 1px;
+  overflow: hidden;
+  clip: rect(1px 1px 1px 1px); /* IE6, IE7 */
+  clip: rect(1px, 1px, 1px, 1px);
+}
+
 .tac {
   text-align: center;
 }
@@ -139,6 +153,10 @@ a {
   cursor: pointer;
 }
 
+a.h-u:hover {
+  text-decoration: underline;
+}
+
 .secondaryLink:hover {
   text-decoration: underline;
 }
@@ -166,10 +184,7 @@ bold {
   display: list-item;
 }
 
-/* 
-* do not show the ada chat app button site-wide
-*/
-.ada-chat-button {
+button.ada-chat-button {
   display: none !important;
 }
 
@@ -236,6 +251,21 @@ a.black:not(.nu):active {
   flex-basis: 100%;
   margin-top: 24px !important;
 }
+
+@media (min-width: 960px) {
+  .mlMain {
+    max-width: 70%;
+    flex-basis: 70%;
+  }
+  .mlSidebar {
+    position: sticky;
+    top: 0;
+    align-self: flex-start;
+    max-width: 30%;
+    padding: 8px !important;
+    margin-top: 0 !important;
+  }
+}
 @media (min-width: 1280px) {
   .mlMain {
     max-width: 78.8%;
@@ -243,9 +273,7 @@ a.black:not(.nu):active {
   }
   .mlSidebar {
     max-width: 21.2%;
-    max-width: 21.2%;
-    padding-left: 16px !important;
-    margin-top: 0 !important;
+    padding: 8px 24px !important;
   }
 }
 .p0 {
@@ -296,4 +324,8 @@ button::-moz-focus-inner {
 .no-transition *::before,
 .no-transition *::after {
   transition: none !important;
+}
+
+.terminal {
+  padding: 24px;
 }

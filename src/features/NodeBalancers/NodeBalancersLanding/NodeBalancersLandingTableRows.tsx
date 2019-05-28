@@ -10,19 +10,14 @@ import EntityIcon from 'src/components/EntityIcon';
 import Grid from 'src/components/Grid';
 import TableCell from 'src/components/TableCell';
 import TableRow from 'src/components/TableRow';
-import TagsCell from 'src/components/TagsCell';
 import IPAddress from 'src/features/linodes/LinodesLanding/IPAddress';
 import RegionIndicator from 'src/features/linodes/LinodesLanding/RegionIndicator';
-import { convertMegabytesTo } from 'src/utilities/convertMegabytesTo';
+import { convertMegabytesTo } from 'src/utilities/unitConversions';
 import NodeBalancerActionMenu from './NodeBalancerActionMenu';
 
-type ClassNames = 'ip' | 'tagWrapper' | 'ipsWrapper' | 'icon';
+type ClassNames = 'tagWrapper' | 'ipsWrapper' | 'icon';
 
 const styles: StyleRulesCallback<ClassNames> = theme => ({
-  ip: {
-    width: '30%',
-    minWidth: 200
-  },
   tagWrapper: {
     marginTop: theme.spacing.unit / 2,
     '& [class*="MuiChip"]': {
@@ -49,7 +44,7 @@ const styles: StyleRulesCallback<ClassNames> = theme => ({
 
 interface Props {
   data: Linode.NodeBalancerWithConfigs[];
-  toggleDialog: (id: number) => void;
+  toggleDialog: (id: number, label: string) => void;
 }
 
 type CombinedProps = Props & WithStyles<ClassNames>;
@@ -75,27 +70,23 @@ const NodeBalancersLandingTableRows: React.StatelessComponent<
         return (
           <TableRow
             key={nodeBalancer.id}
-            data-qa-nodebalancer-cell
+            data-qa-nodebalancer-cell={nodeBalancer.label}
             rowLink={`/nodebalancers/${nodeBalancer.id}`}
             className="fade-in-table"
             aria-label={nodeBalancer.label}
           >
             <TableCell parentColumn="Name" data-qa-nodebalancer-label>
-              <Link to={`/nodebalancers/${nodeBalancer.id}`}>
-                <Grid container wrap="nowrap" alignItems="center">
-                  <Grid item className="py0">
-                    <EntityIcon variant="nodebalancer" marginTop={1} />
-                  </Grid>
-                  <Grid item>
-                    <Typography variant="h3">{nodeBalancer.label}</Typography>
-                  </Grid>
+              <Grid container wrap="nowrap" alignItems="center">
+                <Grid item className="py0">
+                  <EntityIcon variant="nodebalancer" marginTop={1} />
                 </Grid>
-              </Link>
+                <Grid item>
+                  <Typography variant="h3">{nodeBalancer.label}</Typography>
+                </Grid>
+              </Grid>
             </TableCell>
-            <TagsCell tags={nodeBalancer.tags} />
             <TableCell parentColumn="Node Status" data-qa-node-status>
-              <span>{nodesUp} up</span> <br />
-              <span>{nodesDown} down</span>
+              <span>{nodesUp} up</span> - <span>{nodesDown} down</span>
             </TableCell>
             <TableCell parentColumn="Transferred" data-qa-transferred>
               {convertMegabytesTo(nodeBalancer.transfer.total)}
@@ -116,12 +107,9 @@ const NodeBalancersLandingTableRows: React.StatelessComponent<
                 </React.Fragment>
               ))}
             </TableCell>
-            <TableCell parentColumn="IP Addresses" data-qa-nodebalancer-ips>
+            <TableCell parentColumn="IP Address" data-qa-nodebalancer-ips>
               <div className={classes.ipsWrapper}>
                 <IPAddress ips={[nodeBalancer.ipv4]} copyRight showMore />
-                {nodeBalancer.ipv6 && (
-                  <IPAddress ips={[nodeBalancer.ipv6]} copyRight showMore />
-                )}
               </div>
             </TableCell>
             <TableCell parentColumn="Region" data-qa-region>
@@ -131,6 +119,7 @@ const NodeBalancersLandingTableRows: React.StatelessComponent<
               <NodeBalancerActionMenu
                 nodeBalancerId={nodeBalancer.id}
                 toggleDialog={toggleDialog}
+                label={nodeBalancer.label}
               />
             </TableCell>
           </TableRow>

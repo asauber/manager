@@ -53,7 +53,10 @@ const styles: StyleRulesCallback = theme => {
     },
     important: {
       backgroundColor: theme.bg.white,
-      padding: theme.spacing.unit * 2
+      padding: theme.spacing.unit * 2,
+      '& $noticeText': {
+        fontFamily: theme.font.normal
+      }
     },
     inner: {
       width: '100%'
@@ -65,9 +68,9 @@ const styles: StyleRulesCallback = theme => {
     },
     noticeText: {
       color: theme.palette.text.primary,
-      fontFamily: 'LatoWebBold',
       fontSize: '1rem',
-      lineHeight: 1.2
+      lineHeight: 1.2,
+      fontFamily: 'LatoWebBold' // we keep this bold at all times
     },
     error: {
       borderLeft: `5px solid ${status.errorDark}`,
@@ -158,7 +161,7 @@ const Notice: React.StatelessComponent<CombinedProps> = props => {
       {...typeProps}
       component="div"
       onClick={onClick}
-      className={classes.noticeText}
+      className={`${classes.noticeText} noticeText`}
     >
       {text && text}
       {children && children}

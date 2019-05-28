@@ -22,7 +22,7 @@ export class ListLinodes extends Page {
     get linodeActionMenu() { return $('[data-qa-action-menu]'); }
     get listToggle() { return $('[data-qa-view="list"]'); }
     get gridToggle() { return $('[data-qa-view="grid"]'); }
-    get status() { return $('[data-qa-status]') }
+    get status() { return $('[data-qa-entity-status]') }
     get tableHead() { return $('[data-qa-table-head]'); }
     get linodeSortAttribute() { return 'data-qa-sort-label'; }
     get sortLinodesByLabel() { return $(`[${this.linodeSortAttribute}]`); }
@@ -57,6 +57,10 @@ export class ListLinodes extends Page {
         return `[data-qa-linode="${linode}"]`;
     }
 
+    hoverLinodeTags(linode){
+        $(`${this.getLinodeSelector(linode)}>td:nth-child(1)`).moveToObject();
+    }
+
     getLinodeTags(linode){
         return $(this.getLinodeSelector(linode)).$$(this.tag.selector)
             .map(tag => tag.getText());
@@ -69,9 +73,11 @@ export class ListLinodes extends Page {
     }
 
     navigateToDetail(linode) {
-       const linodeLink = linode ? $$(`${this.getLinodeSelector(linode)} a>div`)[0] : this.linode[0].$$('a>div')[0];
-       linodeLink.waitForVisible(constants.wait.normal);
-       linodeLink.click();
+        $('[data-qa-linode] [data-qa-label]').waitForVisible(constants.wait.normal)
+        const linodeLink = linode
+            ? $(`${this.getLinodeSelector(linode)} [data-qa-label]`)
+            : this.linode[0].$('[data-qa-label]');
+        linodeLink.click();
     }
 
     gridElemsDisplay() {
@@ -109,7 +115,7 @@ export class ListLinodes extends Page {
     }
 
     getStatus(linode) {
-        return $(`${this.getLinodeSelector(linode)} ${this.status.selector}`).getAttribute('data-qa-status');
+        return $(`${this.getLinodeSelector(linode)} ${this.status.selector}`).getAttribute('data-qa-entity-status');
     }
 
     reboot(linode) {
@@ -119,31 +125,31 @@ export class ListLinodes extends Page {
             // Select from action menu
             linode.$(this.linodeActionMenu.selector).click();
             browser.click('[data-qa-action-menu-item="Reboot"]');
-            this.acceptDialog('Confirm Reboot');
+            this.acceptDialog('Reboot');
             browser.waitForVisible('[data-qa-loading]');
         }
 
         if (activeView === 'grid') {
             linode.$(this.rebootButton).click();
-            this.acceptDialog('Confirm Reboot');
+            this.acceptDialog('Reboot');
             browser.waitForVisible('[data-qa-circular-progress]');
         }
 
         browser.waitUntil(function() {
-            return linode.$(this.status.selector).getAttribute('data-qa-status') === 'rebooting';
+            return linode.$(this.status.selector).getAttribute('data-qa-entity-status') === 'rebooting';
         }, constants.wait.long);
 
         browser.waitUntil(function() {
-            return linode.$(this.status).getAttribute('data-qa-status') === 'running';
+            return linode.$(this.status).getAttribute('data-qa-entity-status') === 'running';
         }, constants.wait.long);
     }
 
     powerOff(linode) {
         this.selectActionMenuItemV2(this.getLinodeSelector(linode),'Power Off');
-        this.acceptDialog('Powering Off');
+        this.acceptDialog('Power Off');
 
         browser.waitUntil(function() {
-            return browser.isVisible(`${this.getLinodeSelector(linode)} [data-qa-status="offline"]`);
+            return browser.isVisible(`${this.getLinodeSelector(linode)} [data-qa-entity-status="offline"]`);
         }, constants.wait.minute * 3, 'Failed to power down linode');
     }
 
@@ -151,7 +157,7 @@ export class ListLinodes extends Page {
         this.selectActionMenuItem(linode, 'Power On');
 
         browser.waitUntil(function() {
-            return browser.isVisible('[data-qa-status="running"]');
+            return browser.isVisible('[data-qa-entity-status="running"]');
         }, constants.wait.minute * 2);
     }
 
@@ -172,7 +178,7 @@ export class ListLinodes extends Page {
         this.confirmDialogTitle.waitForVisible();
         this.confirmDialogCancel.waitForVisible();
         this.confirmDialogSubmit.waitForVisible();
-        expect(this.confirmDialogTitle.getText()).toBe(dialogTitle);
+        expect(this.confirmDialogTitle.getText()).toMatch(dialogTitle);
         this.confirmDialogSubmit.click();
         this.confirmDialogTitle.waitForVisible(constants.wait.normal, true);
     }

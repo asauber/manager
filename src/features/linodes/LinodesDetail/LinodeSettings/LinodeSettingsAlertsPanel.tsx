@@ -1,5 +1,6 @@
-import { compose, lensPath, pathOr, set } from 'ramda';
+import { compose, lensPath, set } from 'ramda';
 import * as React from 'react';
+import { compose as rCompose } from 'recompose';
 import ActionsPanel from 'src/components/ActionsPanel';
 import Button from 'src/components/Button';
 import {
@@ -10,10 +11,12 @@ import {
 import ExpansionPanel from 'src/components/ExpansionPanel';
 import Notice from 'src/components/Notice';
 import PanelErrorBoundary from 'src/components/PanelErrorBoundary';
+import { withLinodeDetailContext } from 'src/features/linodes/LinodesDetail/linodeDetailContext';
 import {
   LinodeActionsProps,
   withLinodeActions
 } from 'src/store/linodes/linode.containers';
+import { getAPIErrorOrDefault } from 'src/utilities/errorUtils';
 import getAPIErrorFor from 'src/utilities/getAPIErrorFor';
 import AlertSection from './AlertSection';
 
@@ -59,7 +62,10 @@ interface Section {
   endAdornment: string;
 }
 
-type CombinedProps = Props & LinodeActionsProps & WithStyles<ClassNames>;
+type CombinedProps = Props &
+  ContextProps &
+  LinodeActionsProps &
+  WithStyles<ClassNames>;
 
 const maybeNumber = (v: string) => (v === '' ? '' : Number(v));
 
@@ -213,12 +219,14 @@ class LinodeSettingsAlertsPanel extends React.Component<CombinedProps, State> {
         false
       );
 
+    const { permissions } = this.props;
+
     return (
       <ActionsPanel>
         <Button
           type="primary"
           onClick={this.setLinodeAlertThresholds}
-          disabled={noError}
+          disabled={noError || permissions === 'read_only'}
           loading={noError}
           data-qa-alerts-save
         >
@@ -260,17 +268,16 @@ class LinodeSettingsAlertsPanel extends React.Component<CombinedProps, State> {
       .catch(error => {
         this.setState({
           submitting: false,
-          errors: pathOr(
-            [{ reason: 'Unable to update alerts thresholds.' }],
-            ['response', 'data', 'errors'],
-            error
+          errors: getAPIErrorOrDefault(
+            error,
+            'Unable to update alerts thresholds.'
           )
         });
       });
   };
 
   public render() {
-    const { classes } = this.props;
+    const { classes, permissions } = this.props;
     const alertSections: Section[] = this.renderAlertSections();
     const hasErrorFor = getAPIErrorFor({}, this.state.errors);
     const generalError = hasErrorFor('none');
@@ -287,6 +294,7 @@ class LinodeSettingsAlertsPanel extends React.Component<CombinedProps, State> {
             updateFor={[p.state, p.value, this.state.errors, classes]}
             key={idx}
             {...p}
+            readOnly={permissions === 'read_only'}
           />
         ))}
       </ExpansionPanel>
@@ -303,8 +311,17 @@ const errorBoundary = PanelErrorBoundary({
   heading: 'Notification Thresholds'
 });
 
-export default compose(
+interface ContextProps {
+  permissions: Linode.GrantLevel;
+}
+
+const linodeContext = withLinodeDetailContext<ContextProps>(({ linode }) => ({
+  permissions: linode._permissions
+}));
+
+export default rCompose<CombinedProps, Props>(
   errorBoundary,
+  linodeContext,
   styled,
   withLinodeActions
 )(LinodeSettingsAlertsPanel) as React.ComponentType<Props>;

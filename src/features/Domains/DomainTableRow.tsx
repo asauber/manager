@@ -1,5 +1,4 @@
 import * as React from 'react';
-import { Link } from 'react-router-dom';
 import {
   StyleRulesCallback,
   WithStyles,
@@ -29,12 +28,15 @@ const styles: StyleRulesCallback<ClassNames> = theme => ({
     backgroundColor: theme.bg.white
   },
   domainCellContainer: {
-    padding: `${theme.spacing.unit}px !important`
+    [theme.breakpoints.down('sm')]: {
+      textAlign: 'left'
+    }
   },
   labelStatusWrapper: {
     display: 'flex',
     flexFlow: 'row nowrap',
-    alignItems: 'center'
+    alignItems: 'center',
+    wordBreak: 'break-all'
   },
   tagWrapper: {
     marginTop: theme.spacing.unit / 2,
@@ -50,45 +52,70 @@ interface Props {
   tags: string[];
   status: string;
   type: 'master' | 'slave';
-  onRemove: (domain: string, domainID: number) => void;
-  onClone: (domain: string, cloneId: number) => void;
+  onRemove: (domain: string, domainId: number) => void;
+  onClone: (domain: string, id: number) => void;
+  onEdit: (domain: string, id: number) => void;
 }
 
 type CombinedProps = Props & WithStyles<ClassNames>;
 
+const handleRowClick = (
+  e:
+    | React.ChangeEvent<HTMLTableRowElement>
+    | React.MouseEvent<HTMLAnchorElement, MouseEvent>,
+  props: CombinedProps
+) => {
+  const { domain, id, type, onEdit } = props;
+
+  if (type === 'slave') {
+    e.preventDefault();
+    onEdit(domain, id);
+  }
+};
+
 const DomainTableRow: React.StatelessComponent<CombinedProps> = props => {
-  const { classes, domain, id, tags, type, status, onClone, onRemove } = props;
+  const {
+    classes,
+    domain,
+    id,
+    tags,
+    type,
+    status,
+    onClone,
+    onRemove,
+    onEdit
+  } = props;
 
   return (
     <TableRow
       key={id}
       data-qa-domain-cell={domain}
       className={`${classes.domainRow} ${'fade-in-table'}`}
-      rowLink={`/domains/${id}`}
+      rowLink={
+        type === 'slave' ? e => handleRowClick(e, props) : `/domains/${id}`
+      }
     >
       <TableCell parentColumn="Domain" data-qa-domain-label>
-        <Link to={`/domains/${id}`}>
-          <Grid container wrap="nowrap" alignItems="center">
-            <Grid item className="py0">
-              <EntityIcon
-                variant="domain"
-                status={status}
-                marginTop={1}
-                loading={status === 'edit_mode'}
-              />
-            </Grid>
-            <Grid item className={classes.domainCellContainer}>
-              <div className={classes.labelStatusWrapper}>
-                <Typography role="header" variant="h3" data-qa-label>
-                  {domain}
-                </Typography>
-              </div>
-              <div className={classes.tagWrapper}>
-                <Tags tags={tags} />
-              </div>
-            </Grid>
+        <Grid container wrap="nowrap" alignItems="center">
+          <Grid item className="py0">
+            <EntityIcon
+              variant="domain"
+              status={status}
+              marginTop={1}
+              loading={status === 'edit_mode'}
+            />
           </Grid>
-        </Link>
+          <Grid item className={classes.domainCellContainer}>
+            <div className={classes.labelStatusWrapper}>
+              <Typography variant="h3" data-qa-label>
+                {domain}
+              </Typography>
+            </div>
+            <div className={classes.tagWrapper}>
+              <Tags tags={tags} />
+            </div>
+          </Grid>
+        </Grid>
       </TableCell>
       <TableCell parentColumn="Type" data-qa-domain-type>
         {type}
@@ -97,8 +124,10 @@ const DomainTableRow: React.StatelessComponent<CombinedProps> = props => {
         <ActionMenu
           domain={domain}
           id={id}
+          type={type}
           onRemove={onRemove}
           onClone={onClone}
+          onEdit={onEdit}
         />
       </TableCell>
     </TableRow>
